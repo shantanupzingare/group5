@@ -1,0 +1,89 @@
+using ExcelDataReader;
+using Microsoft.Data.SqlClient;
+using System.Data;
+using System.IO;
+
+namespace Bulkinsert
+{
+    internal class Program
+    {
+        private static readonly string folderloc = @"C:\Users\shant\Downloads";
+        private static readonly string connectionstring = @"Data Source=SHANTANUZINGARE\SQLEXPRESS;Initial Catalog=Mugenesys;Integrated Security=True;Trust Server Certificate=True;";
+        private static readonly string targetTable = "StudentData";
+
+        static void Main(string[] args)
+        {
+            System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+
+           // Process any existing Excel files on startup
+            foreach (string filePath in Directory.GetFiles(folderloc, "*.xlsx"))
+            {
+                ProcessExcelFile(filePath);
+            }
+
+            //Watch for new files
+            using FileSystemWatcher watcher = new FileSystemWatcher(folderloc, "*.xlsx")
+            {
+                NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite
+            };
+
+            watcher.Created += OnNewExcelFile;
+            watcher.EnableRaisingEvents = true;
+
+            Console.WriteLine("Watching folder for new Excel files...");
+            Console.ReadLine();
+        }
+
+        private static void OnNewExcelFile(object sender, FileSystemEventArgs e)
+        {
+            try
+            {
+                ProcessExcelFile(e.FullPath);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+            }
+        }
+        private static void ProcessExcelFile(string filePath)
+        {
+            try
+            {
+                Console.WriteLine($"Processing File: {Path.GetFileName(filePath)}");
+                System.Threading.Thread.Sleep(2000); // Ensure file write is complete
+
+                using FileStream stream = File.Open(filePath, FileMode.Open, FileAccess.Read);
+                using IExcelDataReader reader = ExcelReaderFactory.CreateReader(stream);
+
+                var result = reader.AsDataSet(new ExcelDataSetConfiguration()
+                {
+                    ConfigureDataTable = _ => new ExcelDataTableConfiguration()
+                    {
+                        UseHeaderRow = true
+                    }
+                });
+
+                DataTable dataTable = result.Tables[0];
+                BulkInsertToSQL(dataTable);
+                Console.WriteLine(" Data inserted successfully!");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error processing file '{Path.GetFileName(filePath)}': {ex.Message}");
+            }
+        }
+
+        private static void BulkInsertToSQL(DataTable dataTable)
+        {
+            using SqlConnection conn = new SqlConnection(connectionstring);
+            conn.Open();
+
+            using SqlBulkCopy bulkCopy = new SqlBulkCopy(conn)
+            {
+                DestinationTableName = targetTable
+            };
+
+            bulkCopy.WriteToServer(dataTable);
+        }
+    }
+}
