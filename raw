@@ -689,3 +689,7 @@ private static void ProcessExcelFile(string filePath)
     }
 }
 
+Processing File: StudentData_100k.xlsx
+Error processing file 'StudentData_100k.xlsx': Cannot insert the value NULL into column 'Id', table 'BulkInsert.dbo.StudentData'; column does not allow nulls. UPDATE fails.
+The statement has been terminated.
+Watching folder for new Excel files...
