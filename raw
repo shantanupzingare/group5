@@ -454,3 +454,43 @@ BEGIN
         VALUES (source.ID, source.Name, source.Email, source.Subject, source.Marks);
 END;
 
+
+
+
+
+
+-- Drop old procedure if exists
+DROP PROCEDURE IF EXISTS usp_UpsertStudentData;
+
+-- Create updated procedure
+CREATE PROCEDURE usp_UpsertStudentData
+    @StudentData StudentDataType4 READONLY
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Deduplicate the source data by keeping only the LAST occurrence of each ID
+    ;WITH LastRecordPerID AS (
+        SELECT *
+        FROM (
+            SELECT *,
+                   ROW_NUMBER() OVER (PARTITION BY ID ORDER BY (SELECT NULL) DESC) AS rn
+            FROM @StudentData
+        ) AS numbered
+        WHERE rn = 1
+    )
+
+    -- Perform the UPSERT (update if exists, insert if not)
+    MERGE INTO StudentData1 AS target
+    USING LastRecordPerID AS source
+    ON target.ID = source.ID
+    WHEN MATCHED THEN 
+        UPDATE SET 
+            Name = source.Name,
+            Email = source.Email,
+            Subject = source.Subject,
+            Marks = source.Marks
+    WHEN NOT MATCHED BY TARGET THEN
+        INSERT (ID, Name, Email, Subject, Marks)
+        VALUES (source.ID, source.Name, source.Email, source.Subject, source.Marks);
+END;
