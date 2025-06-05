@@ -35,13 +35,13 @@ VALUES(SOURCE.ID,SOURCE.NAME,SOURCE.EMAIL,SOURCE.SUBJECT,SOURCE.MARKS);
 END;
 
 
-
 CREATE PROCEDURE usp_UpsertStudentData
     @StudentData StudentDataType READONLY
 AS
 BEGIN
     SET NOCOUNT ON;
 
+    -- Deduplicate by keeping only the LAST row per ID
     ;WITH LastRecordPerID AS (
         SELECT *
         FROM (
@@ -49,7 +49,7 @@ BEGIN
                    ROW_NUMBER() OVER (PARTITION BY ID ORDER BY (SELECT NULL) DESC) AS rn
             FROM @StudentData
         ) AS numbered
-        WHERE rn = 1 -- Keep the last row for each ID
+        WHERE rn = 1
     )
 
     MERGE INTO StudentData AS target
@@ -65,4 +65,5 @@ BEGIN
         INSERT (ID, Name, Email, Subject, Marks)
         VALUES (source.ID, source.Name, source.Email, source.Subject, source.Marks);
 END;
+
 
