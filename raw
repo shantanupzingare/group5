@@ -33,3 +33,9 @@ WHEN NOT MATCHED BY TARGET THEN
 INSERT(ID,NAME,EMAIL,SUBJECT,MARKS)
 VALUES(SOURCE.ID,SOURCE.NAME,SOURCE.EMAIL,SOURCE.SUBJECT,SOURCE.MARKS);
 END;
+
+
+
+Processing File: StudentData_100k.xlsx
+Error processing file 'StudentData_100k.xlsx': The MERGE statement attempted to UPDATE or DELETE the same row more than once. This happens when a target row matches more than one source row. A MERGE statement cannot UPDATE/DELETE the same row of the target table multiple times. Refine the ON clause to ensure a target row matches at most one source row, or use the GROUP BY clause to group the source rows.
+Watching folder for new Excel files...
