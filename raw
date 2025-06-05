@@ -3,3 +3,33 @@ Column, parameter, or variable #1: Cannot find data type StudentDataType.
 Parameter or variable '@StudentData' has an invalid data type.
 Msg 1087, Level 16, State 1, Procedure usp_UpsertStudentData, Line 17
 Must declare the table variable "@StudentData".
+
+
+create table StudentData(
+Id INT PRIMARY KEY,
+Name NVARCHAR(100),
+Email NVARCHAR(100),
+Subject NVARCHAR(100),
+Marks INT
+);
+SELECT * FROM StudentData;
+
+
+CREATE PROCEDURE usp_UpsertStudentData
+@StudentData StudentDataType READONLY
+as
+Begin
+Set NOCOUNT ON;
+MERGE INTO STUDENTDATA AS TARGET
+USING @STUDENTDATA AS SOURCE
+ON TARGET.ID=SOURCE.ID
+WHEN MATCHED THEN
+UPDATE SET
+NAME=SOURCE.NAME,
+EMAIL=SOURCE.EMAIL,
+SUBJECT=SOURCE.SUBJECT,
+MARKS=SOURCE.MARKS
+WHEN NOT MATCHED BY TARGET THEN
+INSERT(ID,NAME,EMAIL,SUBJECT,MARKS)
+VALUES(SOURCE.ID,SOURCE.NAME,SOURCE.EMAIL,SOURCE.SUBJECT,SOURCE.MARKS);
+END;
