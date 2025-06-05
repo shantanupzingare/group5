@@ -1,3 +1,5 @@
+
+
 Msg 2715, Level 16, State 3, Procedure usp_UpsertStudentData, Line 12
 Column, parameter, or variable #1: Cannot find data type StudentDataType.
 Parameter or variable '@StudentData' has an invalid data type.
@@ -494,3 +496,11 @@ BEGIN
         INSERT (ID, Name, Email, Subject, Marks)
         VALUES (source.ID, source.Name, source.Email, source.Subject, source.Marks);
 END;
+
+
+
+Msg 2715, Level 16, State 3, Procedure usp_UpsertStudentData, Line 15
+Column, parameter, or variable #1: Cannot find data type StudentDataType4.
+Parameter or variable '@StudentData' has an invalid data type.
+Msg 1087, Level 16, State 1, Procedure usp_UpsertStudentData, Line 26
+Must declare the table variable "@StudentData".
