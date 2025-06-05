@@ -42,24 +42,18 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    ;WITH NumberedRows AS (
-        SELECT *,
-               ROW_NUMBER() OVER (PARTITION BY ID ORDER BY (SELECT NULL)) AS rn,
-               COUNT(*) OVER (PARTITION BY ID) AS cnt
-        FROM @StudentData
-    ),
-    DeduplicatedSource AS (
+    ;WITH LastRecordPerID AS (
         SELECT *
-        FROM NumberedRows
-        WHERE 
-            -- If only one row for ID, pick rn = 1
-            (cnt = 1 AND rn = 1)
-            -- If multiple rows, pick rn = 2 (second occurrence)
-            OR (cnt > 1 AND rn = 2)
+        FROM (
+            SELECT *,
+                   ROW_NUMBER() OVER (PARTITION BY ID ORDER BY (SELECT NULL) DESC) AS rn
+            FROM @StudentData
+        ) AS numbered
+        WHERE rn = 1 -- Keep the last row for each ID
     )
 
     MERGE INTO StudentData AS target
-    USING DeduplicatedSource AS source
+    USING LastRecordPerID AS source
     ON target.ID = source.ID
     WHEN MATCHED THEN 
         UPDATE SET 
