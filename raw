@@ -390,3 +390,42 @@ BEGIN
         INSERT (ID, Name, Email, Subject, Marks)
         VALUES (source.ID, source.Name, source.Email, source.Subject, source.Marks);
 END;
+
+
+
+
+
+
+
+CREATE PROCEDURE usp_UpsertStudentData1
+    @StudentData1 StudentDataType4 READONLY
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Deduplicate by keeping only the latest row based on ImportOrder
+    ;WITH LastRecordPerID AS (
+        SELECT *
+        FROM (
+            SELECT *,
+                   ROW_NUMBER() OVER (PARTITION BY ID ORDER BY ImportOrder DESC) AS rn
+            FROM @StudentData1
+        ) AS numbered
+        WHERE rn = 1
+    )
+
+    -- UPSERT logic
+    MERGE INTO StudentData1 AS target
+    USING LastRecordPerID AS source
+    ON target.ID = source.ID
+    WHEN MATCHED THEN 
+        UPDATE SET 
+            Name = source.Name,
+            Email = source.Email,
+            Subject = source.Subject,
+            Marks = source.Marks
+    WHEN NOT MATCHED BY TARGET THEN
+        INSERT (ID, Name, Email, Subject, Marks)
+        VALUES (source.ID, source.Name, source.Email, source.Subject, source.Marks);
+END;
+
