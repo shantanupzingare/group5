@@ -693,3 +693,44 @@ Processing File: StudentData_100k.xlsx
 Error processing file 'StudentData_100k.xlsx': Cannot insert the value NULL into column 'Id', table 'BulkInsert.dbo.StudentData'; column does not allow nulls. UPDATE fails.
 The statement has been terminated.
 Watching folder for new Excel files...
+
+
+
+CREATE PROCEDURE usp_UpsertStudentData
+    @StudentData StudentDataType READONLY
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- ✅ Step 1: Filter out invalid rows (ID is NULL or <= 0)
+    ;WITH CleanedData AS (
+        SELECT *
+        FROM @StudentData
+        WHERE ID IS NOT NULL AND ID > 0
+    ),
+    
+    -- ✅ Step 2: Deduplicate - Keep only last row for each ID
+    LastRecordPerID AS (
+        SELECT *
+        FROM (
+            SELECT *, ROW_NUMBER() OVER (PARTITION BY ID ORDER BY (SELECT NULL) DESC) AS rn
+            FROM CleanedData
+        ) AS numbered
+        WHERE rn = 1
+    )
+
+    -- ✅ Step 3: Perform UPSERT
+    MERGE INTO StudentData AS target
+    USING LastRecordPerID AS source
+    ON target.ID = source.ID
+    WHEN MATCHED THEN 
+        UPDATE SET 
+            Name = source.Name,
+            Email = source.Email,
+            Subject = source.Subject,
+            Marks = source.Marks
+    WHEN NOT MATCHED BY TARGET THEN
+        INSERT (ID, Name, Email, Subject, Marks)
+        VALUES (source.ID, source.Name, source.Email, source.Subject, source.Marks);
+END;
+
