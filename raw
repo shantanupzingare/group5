@@ -396,6 +396,31 @@ END;
 
 
 
+create table StudentData1(
+Id INT PRIMARY KEY,
+Name NVARCHAR(100),
+Email NVARCHAR(100),
+Subject NVARCHAR(100),
+Marks INT
+);
+
+select * from StudentData1;
+
+
+
+
+create type StudentDataType4 as table
+(
+ID INT,
+NAME NVARCHAR(100),
+EMAIL NVARCHAR(100),
+SUBJECT NVARCHAR(100),
+MARKS INT
+);
+
+drop procedure if exists usp_UpsertStudentData;
+
+
 
 CREATE PROCEDURE usp_UpsertStudentData1
     @StudentData1 StudentDataType4 READONLY
@@ -403,18 +428,18 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    -- Deduplicate by keeping only the latest row based on ImportOrder
+    -- Deduplicate the source data by keeping only the LAST occurrence of each ID
     ;WITH LastRecordPerID AS (
         SELECT *
         FROM (
             SELECT *,
-                   ROW_NUMBER() OVER (PARTITION BY ID ORDER BY ImportOrder DESC) AS rn
+                   ROW_NUMBER() OVER (PARTITION BY ID ORDER BY (SELECT NULL) DESC) AS rn
             FROM @StudentData1
         ) AS numbered
         WHERE rn = 1
     )
 
-    -- UPSERT logic
+    -- Perform the UPSERT (update if exists, insert if not)
     MERGE INTO StudentData1 AS target
     USING LastRecordPerID AS source
     ON target.ID = source.ID
