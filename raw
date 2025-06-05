@@ -67,3 +67,31 @@ BEGIN
 END;
 
 
+CREATE PROCEDURE usp_UpsertStudentData
+    @StudentData StudentDataType READONLY
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Step 1: Deduplicate source by keeping only the last row per Id
+    WITH DeduplicatedSource AS (
+        SELECT *
+        FROM (
+            SELECT *, 
+                   ROW_NUMBER() OVER (PARTITION BY Id ORDER BY (SELECT NULL)) AS rn
+            FROM @StudentData
+        ) AS numbered
+        WHERE rn = 1
+    )
+
+    -- Step 2: Delete existing rows in the target table that match incoming Ids
+    DELETE FROM StudentData
+    WHERE Id IN (SELECT Id FROM DeduplicatedSource);
+
+    -- Step 3: Insert latest version of rows into the target table
+    INSERT INTO StudentData (Id, Name, Email, Subject, Marks)
+    SELECT Id, Name, Email, Subject, Marks
+    FROM DeduplicatedSource;
+END;
+
+
