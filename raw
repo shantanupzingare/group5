@@ -36,6 +36,39 @@ END;
 
 
 
-Processing File: StudentData_100k.xlsx
-Error processing file 'StudentData_100k.xlsx': The MERGE statement attempted to UPDATE or DELETE the same row more than once. This happens when a target row matches more than one source row. A MERGE statement cannot UPDATE/DELETE the same row of the target table multiple times. Refine the ON clause to ensure a target row matches at most one source row, or use the GROUP BY clause to group the source rows.
-Watching folder for new Excel files...
+CREATE PROCEDURE usp_UpsertStudentData
+    @StudentData StudentDataType READONLY
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    ;WITH NumberedRows AS (
+        SELECT *,
+               ROW_NUMBER() OVER (PARTITION BY ID ORDER BY (SELECT NULL)) AS rn,
+               COUNT(*) OVER (PARTITION BY ID) AS cnt
+        FROM @StudentData
+    ),
+    DeduplicatedSource AS (
+        SELECT *
+        FROM NumberedRows
+        WHERE 
+            -- If only one row for ID, pick rn = 1
+            (cnt = 1 AND rn = 1)
+            -- If multiple rows, pick rn = 2 (second occurrence)
+            OR (cnt > 1 AND rn = 2)
+    )
+
+    MERGE INTO StudentData AS target
+    USING DeduplicatedSource AS source
+    ON target.ID = source.ID
+    WHEN MATCHED THEN 
+        UPDATE SET 
+            Name = source.Name,
+            Email = source.Email,
+            Subject = source.Subject,
+            Marks = source.Marks
+    WHEN NOT MATCHED BY TARGET THEN
+        INSERT (ID, Name, Email, Subject, Marks)
+        VALUES (source.ID, source.Name, source.Email, source.Subject, source.Marks);
+END;
+
