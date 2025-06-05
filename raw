@@ -649,3 +649,43 @@ namespace Bulkinsert1
         }
     }
 }
+
+
+
+
+
+private static void ProcessExcelFile(string filePath)
+{
+    try
+    {
+        Console.WriteLine($"Processing File: {Path.GetFileName(filePath)}");
+        System.Threading.Thread.Sleep(2000); // Ensure file write is complete
+
+        using FileStream stream = File.Open(filePath, FileMode.Open, FileAccess.Read);
+        using IExcelDataReader reader = ExcelReaderFactory.CreateReader(stream);
+
+        var result = reader.AsDataSet(new ExcelDataSetConfiguration()
+        {
+            ConfigureDataTable = _ => new ExcelDataTableConfiguration()
+            {
+                UseHeaderRow = true
+            }
+        });
+
+        DataTable originalTable = result.Tables[0];
+
+        // 🔥 Remove duplicates and keep last record by ID
+        var distinctTable = originalTable.AsEnumerable()
+            .GroupBy(row => row.Field<int>("ID"))
+            .Select(g => g.Last()) // Keeps the last row for each ID
+            .CopyToDataTable();
+
+        BulkInsertToSQL(distinctTable);
+        Console.WriteLine(" Data inserted successfully!");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error processing file '{Path.GetFileName(filePath)}': {ex.Message}");
+    }
+}
+
