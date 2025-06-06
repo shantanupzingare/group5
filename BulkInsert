@@ -87,3 +87,177 @@ namespace Bulkinsert
         }
     }
 }
+
+
+
+
+
+using the stored procedure
+
+
+create table StudentData(
+Id INT PRIMARY KEY,
+Name NVARCHAR(100),
+Email NVARCHAR(100),
+Subject NVARCHAR(100),
+Marks INT
+);
+SELECT * FROM StudentData;
+ 
+drop table StudentData;
+
+TRUNCATE TABLE STUDENTDATA;
+
+
+create type StudentDataType as table
+(
+ID INT,
+NAME NVARCHAR(100),
+EMAIL NVARCHAR(100),
+SUBJECT NVARCHAR(100),
+MARKS INT
+);
+
+drop procedure if exists usp_UpsertStudentData;
+
+CREATE PROCEDURE usp_UpsertStudentData
+    @StudentData StudentDataType READONLY
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- ✅ Step 1: Filter out invalid rows (ID is NULL or <= 0)
+    ;WITH CleanedData AS (
+        SELECT *
+        FROM @StudentData
+        WHERE ID IS NOT NULL AND ID > 0
+    ),
+    
+    -- ✅ Step 2: Deduplicate - Keep only last row for each ID
+    LastRecordPerID AS (
+        SELECT *
+        FROM (
+            SELECT *, ROW_NUMBER() OVER (PARTITION BY ID ORDER BY (SELECT NULL) DESC) AS rn
+            FROM CleanedData
+        ) AS numbered
+        WHERE rn = 1
+    )
+
+    -- ✅ Step 3: Perform UPSERT
+    MERGE INTO StudentData AS target
+    USING LastRecordPerID AS source
+    ON target.ID = source.ID
+    WHEN MATCHED THEN 
+        UPDATE SET 
+            Name = source.Name,
+            Email = source.Email,
+            Subject = source.Subject,
+            Marks = source.Marks
+    WHEN NOT MATCHED BY TARGET THEN
+        INSERT (ID, Name, Email, Subject, Marks)
+        VALUES (source.ID, source.Name, source.Email, source.Subject, source.Marks);
+END;
+
+
+
+
+
+using ExcelDataReader;
+using System.Data;
+using System.Data.SqlClient;
+using System.IO;
+
+namespace Bulkinsert1
+{
+    internal class Program
+    {
+        private static readonly string folderloc = @"C:\Users\Shantanu\Downloads";
+        private static readonly string connectionstring = @"Data Source=10.100.1.57;Initial Catalog=BulkInsert;User ID=sa;Password=Sa@123;Connect Timeout=30;Encrypt=False;TrustServerCertificate=True;ApplicationIntent=ReadWrite;MultiSubnetFailover=False";
+        private static readonly string targetTable = "StudentData";
+
+        static void Main(string[] args)
+        {
+            System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+
+            // Process any existing Excel files on startup
+            foreach (string filePath in Directory.GetFiles(folderloc, "*.xlsx"))
+            {
+                ProcessExcelFile(filePath);
+            }
+
+            //Watch for new files
+            using FileSystemWatcher watcher = new FileSystemWatcher(folderloc, "*.xlsx")
+            {
+                NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite
+            };
+
+            watcher.Created += OnNewExcelFile;
+            watcher.EnableRaisingEvents = true;
+
+            Console.WriteLine("Watching folder for new Excel files...");
+            Console.ReadLine();
+        }
+
+        private static void OnNewExcelFile(object sender, FileSystemEventArgs e)
+        {
+            try
+            {
+                ProcessExcelFile(e.FullPath);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+            }
+        }
+        private static void ProcessExcelFile(string filePath)
+        {
+            try
+            {
+                Console.WriteLine($"Processing File: {Path.GetFileName(filePath)}");
+                System.Threading.Thread.Sleep(2000); // Ensure file write is complete
+
+                using FileStream stream = File.Open(filePath, FileMode.Open, FileAccess.Read);
+                using IExcelDataReader reader = ExcelReaderFactory.CreateReader(stream);
+
+                var result = reader.AsDataSet(new ExcelDataSetConfiguration()
+                {
+                    ConfigureDataTable = _ => new ExcelDataTableConfiguration()
+                    {
+                        UseHeaderRow = true
+                    }
+                });
+
+                DataTable originalTable = result.Tables[0];
+
+                // 🔥 Remove duplicates and keep last record by ID
+                var distinctTable = originalTable.AsEnumerable()
+                    .GroupBy(row =>row["ID"]==DBNull.Value ? -1:Convert.ToInt32(row["ID"]))
+                    .Select(g => g.Last()) // Keeps the last row for each ID
+                    .CopyToDataTable();
+
+                BulkInsertToSQL(distinctTable);
+                Console.WriteLine(" Data inserted successfully!");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error processing file '{Path.GetFileName(filePath)}': {ex.Message}");
+            }
+        }
+
+        private static void BulkInsertToSQL(DataTable dataTable)
+        {
+            using SqlConnection conn = new SqlConnection(connectionstring);
+            using SqlCommand cmd = new SqlCommand("usp_UpsertStudentData", conn)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
+            //MAP C# dATATABLE TO SQL TVP
+            SqlParameter tvpParam = cmd.Parameters.AddWithValue("@StudentData", dataTable);
+            tvpParam.SqlDbType = SqlDbType.Structured;
+            conn.Open();
+            cmd.ExecuteNonQuery();
+
+           
+        }
+    }
+}
