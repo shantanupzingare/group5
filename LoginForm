@@ -1,0 +1,326 @@
+namespace Sharemodel
+{
+    public class Request
+    {
+        public string? Action { get; set; }
+        public object? Payload { get; set; }
+    }
+    public class LoginPayload
+    {
+        public string? Username { get; set; }
+        public string? Password { get; set; }
+    }
+    public class Studentpayload
+    {
+        public int? Id { get; set; }
+        public string? Name { get; set; }
+        public string? Email { get; set; }
+        public string? Subject { get; set; }
+        public string? Marks { get; set; }
+    }
+}
+
+
+
+
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using Newtonsoft.Json;
+using System.Data.SqlClient;
+using Sharemodel;
+
+namespace TcpServer
+{
+    class Program
+    {
+        static void Main()
+        {
+            TcpListener listener = new TcpListener(IPAddress.Any, 8888);
+            listener.Start();
+            Console.WriteLine("TCP Server Started on port 8888");
+
+            while (true)
+            {
+                var client = listener.AcceptTcpClient();
+                NetworkStream stream = client.GetStream();
+                byte[] buffer = new byte[4096];
+                int byteCount = stream.Read(buffer, 0, buffer.Length);
+                string requestJson = Encoding.UTF8.GetString(buffer, 0, byteCount);
+
+                string response = HandleRequest(requestJson);
+                byte[] responseBytes = Encoding.UTF8.GetBytes(response);
+                stream.Write(responseBytes, 0, responseBytes.Length);
+                client.Close();
+            }
+
+        }
+        static string HandleRequest(string json)
+        {
+            var request = JsonConvert.DeserializeObject<Request>(json);
+
+            switch (request.Action)
+            {
+                case "LOGIN":
+                    var login = JsonConvert.DeserializeObject<LoginPayload>(request.Payload.ToString());
+                    return ValidateLogin(login);
+                case "INSERT":
+                    var student = JsonConvert.DeserializeObject<Studentpayload>(request.Payload.ToString());
+                    return InsertStudent(student);
+                case "UPDATE":
+                    var stuUpdate = JsonConvert.DeserializeObject<Studentpayload>(request.Payload.ToString());
+                    return UpdateStudent(stuUpdate);
+                case "DELETE":
+                    var stuDelete = JsonConvert.DeserializeObject<Studentpayload>(request.Payload.ToString());
+                    return DeleteStudent(stuDelete);
+                default:
+                    return "INVALID_ACTION";
+            }
+        }
+
+        static string ValidateLogin(LoginPayload login)
+        {
+            using var conn = new SqlConnection("Data Source=10.100.1.57;Initial Catalog=Loginpassword;User ID=sa;Password=Sa@123;TrustServerCertificate=True;");
+            conn.Open();
+            var cmd = new SqlCommand("SELECT COUNT(*) FROM Users WHERE Username=@u AND Password=@p", conn);
+            cmd.Parameters.AddWithValue("@u", login.Username);
+            cmd.Parameters.AddWithValue("@p", login.Password);
+            int count = (int)cmd.ExecuteScalar();
+            return count > 0 ? "LOGIN_SUCCESS" : "LOGIN_FAILED";
+        }
+
+
+        static string InsertStudent(Studentpayload s)
+        {
+            using var conn = new SqlConnection("Data Source=10.100.1.57;Initial Catalog=Loginpassword;User ID=sa;Password=Sa@123;TrustServerCertificate=True;");
+            conn.Open();
+
+        
+            var cmd = new SqlCommand(@"
+        MERGE INTO StudentData AS target
+        USING (SELECT @Id AS Id, @Name AS Name, @Email AS Email, @Sub AS Subject, @Marks AS Marks) AS source
+        ON target.Id = source.Id
+        WHEN MATCHED THEN 
+            UPDATE SET Name = source.Name, Email = source.Email, Subject = source.Subject, Marks = source.Marks
+        WHEN NOT MATCHED THEN
+            INSERT (Id, Name, Email, Subject, Marks)
+            VALUES (source.Id, source.Name, source.Email, source.Subject, source.Marks);", conn);
+
+            
+            cmd.Parameters.AddWithValue("@Id", s.Id);
+            cmd.Parameters.AddWithValue("@Name", s.Name);
+            cmd.Parameters.AddWithValue("@Email", s.Email);
+            cmd.Parameters.AddWithValue("@Sub", s.Subject);
+            cmd.Parameters.AddWithValue("@Marks", s.Marks);
+
+            return cmd.ExecuteNonQuery() > 0 ? "INSERT_OR_UPDATE_SUCCESS" : "INSERT_OR_UPDATE_FAILED"; 
+        }
+
+
+        static string UpdateStudent(Studentpayload s)
+        {
+            using var conn = new SqlConnection("Data Source=10.100.1.57;Initial Catalog=Loginpassword;User ID=sa;Password=Sa@123;TrustServerCertificate=True;");
+            conn.Open();
+            var cmd = new SqlCommand("UPDATE StudentData SET Name=@Name, Email=@Email, Subject=@Sub, Marks=@Marks WHERE Id=@Id", conn);
+            cmd.Parameters.AddWithValue("@Id", s.Id);
+            cmd.Parameters.AddWithValue("@Name", s.Name);
+            cmd.Parameters.AddWithValue("@Email", s.Email);
+            cmd.Parameters.AddWithValue("@Sub", s.Subject);
+            cmd.Parameters.AddWithValue("@Marks", s.Marks);
+            return cmd.ExecuteNonQuery() > 0 ? "UPDATE_SUCCESS" : "UPDATE_FAILED";
+        }
+
+        static string DeleteStudent(Studentpayload s)
+        {
+            using var conn = new SqlConnection("Data Source=10.100.1.57;Initial Catalog=Loginpassword;User ID=sa;Password=Sa@123;TrustServerCertificate=True;");
+            conn.Open();
+            var cmd = new SqlCommand("DELETE FROM StudentData WHERE Id=@Id", conn);
+            cmd.Parameters.AddWithValue("@Id", s.Id);
+            return cmd.ExecuteNonQuery() > 0 ? "DELETE_SUCCESS" : "DELETE_FAILED";
+        }
+
+    }
+}
+
+
+
+
+<Window x:Class="UserInterface.StudentWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Student Form" Height="500" Width="450" Background="#f7f7f7"
+        WindowStartupLocation="CenterScreen">
+    <Border BorderBrush="#ccc" BorderThickness="1" CornerRadius="10" Margin="10" Padding="20" Background="White">
+        <StackPanel>
+            <TextBlock Text="Student Form" FontSize="22" FontWeight="Bold" Margin="0,0,0,15" HorizontalAlignment="Center" Foreground="#333"/>
+
+            <TextBlock Text="Student ID" Margin="0,5,0,2" FontWeight="SemiBold" Foreground="#555"/>
+            <TextBox x:Name="txtId" Height="30" FontSize="14" Padding="5" Background="#fafafa" BorderBrush="#ccc" BorderThickness="1"/>
+
+            <TextBlock Text="Name" Margin="0,5,0,2" FontWeight="SemiBold" Foreground="#555"/>
+            <TextBox x:Name="txtName" Height="30" FontSize="14" Padding="5" Background="#fafafa" BorderBrush="#ccc" BorderThickness="1"/>
+
+            <TextBlock Text="Email" Margin="0,5,0,2" FontWeight="SemiBold" Foreground="#555"/>
+            <TextBox x:Name="txtEmail" Height="30" FontSize="14" Padding="5" Background="#fafafa" BorderBrush="#ccc" BorderThickness="1"/>
+
+            <TextBlock Text="Subject" Margin="0,5,0,2" FontWeight="SemiBold" Foreground="#555"/>
+            <TextBox x:Name="txtSubject" Height="30" FontSize="14" Padding="5" Background="#fafafa" BorderBrush="#ccc" BorderThickness="1"/>
+
+            <TextBlock Text="Marks" Margin="0,5,0,2" FontWeight="SemiBold" Foreground="#555"/>
+            <TextBox x:Name="txtMarks" Height="30" FontSize="14" Padding="5" Background="#fafafa" BorderBrush="#ccc" BorderThickness="1"/>
+
+            <StackPanel Orientation="Horizontal" Margin="0,20,0,0" HorizontalAlignment="Center">
+                <Button Content="Insert" Click="InsertButton_Click" Width="75" Margin="10,0"
+                        Background="#28a745" Foreground="White" FontWeight="Bold" BorderBrush="#28a745"/>
+                <Button Content="Update" Click="UpdateButton_Click" Width="75" Margin="10,0"
+                        Background="#ffc107" Foreground="Black" FontWeight="Bold" BorderBrush="#ffc107"/>
+                <Button Content="Delete" Click="DeleteButton_Click" Width="75" Margin="10,0"
+                        Background="#dc3545" Foreground="White" FontWeight="Bold" BorderBrush="#dc3545"/>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>
+
+
+
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Navigation;
+using System.Windows.Shapes;
+using UserInterface.ViewModels;
+
+namespace UserInterface
+{
+    /// <summary>
+    /// Interaction logic for MainWindow.xaml
+    /// </summary>
+    public partial class MainWindow : Window
+    {
+        public MainWindow()
+        {
+            InitializeComponent();
+        }
+        private void LoginButton_Click(object sender, RoutedEventArgs e)
+        {
+            var vm = new LoginViewModel { Username = txtUser.Text, Password = txtPass.Password };
+            var result = vm.Login();
+            MessageBox.Show(result);
+            if (result == "LOGIN_SUCCESS")
+            {
+                StudentWindow win = new StudentWindow();
+                win.Show();
+                this.Close();
+            }
+        }
+    }
+}
+
+
+
+<Window x:Class="UserInterface.StudentWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Student Form" Height="500" Width="450" Background="#f7f7f7"
+        WindowStartupLocation="CenterScreen">
+    <Border BorderBrush="#ccc" BorderThickness="1" CornerRadius="10" Margin="10" Padding="20" Background="White">
+        <StackPanel>
+            <TextBlock Text="Student Form" FontSize="22" FontWeight="Bold" Margin="0,0,0,15" HorizontalAlignment="Center" Foreground="#333"/>
+
+            <TextBlock Text="Student ID" Margin="0,5,0,2" FontWeight="SemiBold" Foreground="#555"/>
+            <TextBox x:Name="txtId" Height="30" FontSize="14" Padding="5" Background="#fafafa" BorderBrush="#ccc" BorderThickness="1"/>
+
+            <TextBlock Text="Name" Margin="0,5,0,2" FontWeight="SemiBold" Foreground="#555"/>
+            <TextBox x:Name="txtName" Height="30" FontSize="14" Padding="5" Background="#fafafa" BorderBrush="#ccc" BorderThickness="1"/>
+
+            <TextBlock Text="Email" Margin="0,5,0,2" FontWeight="SemiBold" Foreground="#555"/>
+            <TextBox x:Name="txtEmail" Height="30" FontSize="14" Padding="5" Background="#fafafa" BorderBrush="#ccc" BorderThickness="1"/>
+
+            <TextBlock Text="Subject" Margin="0,5,0,2" FontWeight="SemiBold" Foreground="#555"/>
+            <TextBox x:Name="txtSubject" Height="30" FontSize="14" Padding="5" Background="#fafafa" BorderBrush="#ccc" BorderThickness="1"/>
+
+            <TextBlock Text="Marks" Margin="0,5,0,2" FontWeight="SemiBold" Foreground="#555"/>
+            <TextBox x:Name="txtMarks" Height="30" FontSize="14" Padding="5" Background="#fafafa" BorderBrush="#ccc" BorderThickness="1"/>
+
+            <StackPanel Orientation="Horizontal" Margin="0,20,0,0" HorizontalAlignment="Center">
+                <Button Content="Insert" Click="InsertButton_Click" Width="75" Margin="10,0"
+                        Background="#28a745" Foreground="White" FontWeight="Bold" BorderBrush="#28a745"/>
+                <Button Content="Update" Click="UpdateButton_Click" Width="75" Margin="10,0"
+                        Background="#ffc107" Foreground="Black" FontWeight="Bold" BorderBrush="#ffc107"/>
+                <Button Content="Delete" Click="DeleteButton_Click" Width="75" Margin="10,0"
+                        Background="#dc3545" Foreground="White" FontWeight="Bold" BorderBrush="#dc3545"/>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>
+
+
+
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Shapes;
+using UserInterface.ViewModels;
+
+namespace UserInterface
+{
+    /// <summary>
+    /// Interaction logic for StudentWindow.xaml
+    /// </summary>
+    public partial class StudentWindow : Window
+    {
+        public StudentWindow()
+        {
+            InitializeComponent();
+        }
+        private void InsertButton_Click(object sender, RoutedEventArgs e)
+        {
+            var vm = new StudentViewModel();
+            vm.Student.Id = int.Parse(txtId.Text);
+            vm.Student.Name = txtName.Text;
+            vm.Student.Email = txtEmail.Text;
+            vm.Student.Subject = txtSubject.Text;
+            vm.Student.Marks = txtMarks.Text;  //COMMENT
+            MessageBox.Show(vm.Insert());
+        }
+
+        private void UpdateButton_Click(object sender, RoutedEventArgs e)
+        {
+            var vm = new StudentViewModel();
+            vm.Student.Id = int.Parse(txtId.Text);
+            vm.Student.Name = txtName.Text;
+            vm.Student.Email = txtEmail.Text;
+            vm.Student.Subject = txtSubject.Text;
+            vm.Student.Marks = txtMarks.Text;//
+            MessageBox.Show(vm.Update());
+        }
+
+        private void DeleteButton_Click(object sender, RoutedEventArgs e)
+        {
+            var vm = new StudentViewModel();
+            vm.Student.Id = int.Parse(txtId.Text);
+            MessageBox.Show(vm.Delete());
+        }
+    }
+}
+
