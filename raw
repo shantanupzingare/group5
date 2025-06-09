@@ -288,3 +288,29 @@ private void DeleteButton_Click(object sender, RoutedEventArgs e)
     vm.Student.Id = int.Parse(txtId.Text);
     MessageBox.Show(vm.Delete());
 }
+
+
+
+
+Severity	Code	Description	Project	File	Line	Suppression State
+Error	CS0103	The name 'ValidateLogin' does not exist in the current context	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	39	Active
+Error	CS0103	The name 'UpdateStudent' does not exist in the current context	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	45	Active
+Error	CS0103	The name 'InsertStudent' does not exist in the current context	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	42	Active
+Error	CS0103	The name 'HandleRequest' does not exist in the current context	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	24	Active
+Error	CS0103	The name 'DeleteStudent' does not exist in the current context	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	48	Active
+Warning	CS8604	Possible null reference argument for parameter 'value' in 'Studentpayload? JsonConvert.DeserializeObject<Studentpayload>(string value)'.	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	41	Active
+Warning	CS8604	Possible null reference argument for parameter 'value' in 'Studentpayload? JsonConvert.DeserializeObject<Studentpayload>(string value)'.	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	44	Active
+Warning	CS8604	Possible null reference argument for parameter 'value' in 'Studentpayload? JsonConvert.DeserializeObject<Studentpayload>(string value)'.	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	47	Active
+Warning	CS8604	Possible null reference argument for parameter 'value' in 'LoginPayload? JsonConvert.DeserializeObject<LoginPayload>(string value)'.	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	38	Active
+Warning	CS8602	Dereference of a possibly null reference.	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	35	Active
+Warning	CS8602	Dereference of a possibly null reference.	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	38	Active
+Warning	CS8602	Dereference of a possibly null reference.	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	41	Active
+Warning	CS8602	Dereference of a possibly null reference.	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	44	Active
+Warning	CS8602	Dereference of a possibly null reference.	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	47	Active
+Error	CS0116	A namespace cannot directly contain members such as fields, methods or statements	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	10	Active
+Error	CS0116	A namespace cannot directly contain members such as fields, methods or statements	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	31	Active
+Error	CS0116	A namespace cannot directly contain members such as fields, methods or statements	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	54	Active
+Error	CS0116	A namespace cannot directly contain members such as fields, methods or statements	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	65	Active
+Error	CS0116	A namespace cannot directly contain members such as fields, methods or statements	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	78	Active
+Error	CS0116	A namespace cannot directly contain members such as fields, methods or statements	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	91	Active
+
