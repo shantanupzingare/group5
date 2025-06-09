@@ -314,3 +314,23 @@ Error	CS0116	A namespace cannot directly contain members such as fields, methods
 Error	CS0116	A namespace cannot directly contain members such as fields, methods or statements	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	78	Active
 Error	CS0116	A namespace cannot directly contain members such as fields, methods or statements	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	91	Active
 
+
+
+
+
+TCP Server Started on port 8888
+Unhandled exception. System.Data.SqlClient.SqlException (0x80131904): Invalid object name 'StudentData'.
+   at System.Data.SqlClient.SqlConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)
+   at System.Data.SqlClient.SqlInternalConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)
+   at System.Data.SqlClient.TdsParser.ThrowExceptionAndWarning(TdsParserStateObject stateObj, Boolean callerHasConnectionLock, Boolean asyncClose)
+   at System.Data.SqlClient.TdsParser.TryRun(RunBehavior runBehavior, SqlCommand cmdHandler, SqlDataReader dataStream, BulkCopySimpleResultSet bulkCopyHandler, TdsParserStateObject stateObj, Boolean& dataReady)
+   at System.Data.SqlClient.SqlCommand.FinishExecuteReader(SqlDataReader ds, RunBehavior runBehavior, String resetOptionsString)
+   at System.Data.SqlClient.SqlCommand.RunExecuteReaderTds(CommandBehavior cmdBehavior, RunBehavior runBehavior, Boolean returnStream, Boolean async, Int32 timeout, Task& task, Boolean asyncWrite, SqlDataReader ds)
+   at System.Data.SqlClient.SqlCommand.RunExecuteReader(CommandBehavior cmdBehavior, RunBehavior runBehavior, Boolean returnStream, TaskCompletionSource`1 completion, Int32 timeout, Task& task, Boolean asyncWrite, String method)
+   at System.Data.SqlClient.SqlCommand.InternalExecuteNonQuery(TaskCompletionSource`1 completion, Boolean sendToPipe, Int32 timeout, Boolean asyncWrite, String methodName)
+   at System.Data.SqlClient.SqlCommand.ExecuteNonQuery()
+   at TcpServer.Program.InsertStudent(Studentpayload s) in C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs:line 77
+   at TcpServer.Program.HandleRequest(String json) in C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs:line 44
+   at TcpServer.Program.Main() in C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs:line 26
+ClientConnectionId:733c4d0f-72f9-4a2e-a639-95a694744163
+Error Number:208,State:1,Class:16
