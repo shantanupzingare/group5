@@ -461,7 +461,8 @@ Error Number:208,State:1,Class:16
             </StackPanel>
         </StackPanel>
 
-
+  </Border>
+</Window>
 
 
 
@@ -492,5 +493,4 @@ static string InsertStudent(StudentPayload s)
     return cmd.ExecuteNonQuery() > 0 ? "INSERT_OR_UPDATE_SUCCESS" : "INSERT_OR_UPDATE_FAILED"; // ✅ CHANGED
 }
 
-    </Border>
-</Window>
+  
