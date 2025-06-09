@@ -1,1 +1,256 @@
+// Solution Structure:
+// - SharedModels (Class Library)
+// - TcpServerApp (Console App)
+// - WpfClientApp (WPF MVVM App)
+
+///////////////////////////
+// SharedModels Project  //
+///////////////////////////
+
+// File: Models.cs
+
+namespace SharedModels
+{
+    public class Request
+    {
+        public string Action { get; set; }
+        public object Payload { get; set; }
+    }
+
+    public class LoginPayload
+    {
+        public string Username { get; set; }
+        public string Password { get; set; }
+    }
+
+    public class StudentPayload
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public string Email { get; set; }
+        public string Subject { get; set; }
+        public int Marks { get; set; }
+    }
+}
+
+///////////////////////////
+// TcpServerApp Project //
+///////////////////////////
+
+// File: Program.cs
+
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using Newtonsoft.Json;
+using SharedModels;
+using System.Data.SqlClient;
+
+class Program
+{
+    static void Main()
+    {
+        TcpListener listener = new TcpListener(IPAddress.Any, 8888);
+        listener.Start();
+        Console.WriteLine("TCP Server Started on port 8888");
+
+        while (true)
+        {
+            var client = listener.AcceptTcpClient();
+            NetworkStream stream = client.GetStream();
+            byte[] buffer = new byte[4096];
+            int byteCount = stream.Read(buffer, 0, buffer.Length);
+            string requestJson = Encoding.UTF8.GetString(buffer, 0, byteCount);
+
+            string response = HandleRequest(requestJson);
+            byte[] responseBytes = Encoding.UTF8.GetBytes(response);
+            stream.Write(responseBytes, 0, responseBytes.Length);
+            client.Close();
+        }
+    }
+
+    static string HandleRequest(string json)
+    {
+        var request = JsonConvert.DeserializeObject<Request>(json);
+
+        switch (request.Action)
+        {
+            case "LOGIN":
+                var login = JsonConvert.DeserializeObject<LoginPayload>(request.Payload.ToString());
+                return ValidateLogin(login);
+            case "INSERT":
+                var student = JsonConvert.DeserializeObject<StudentPayload>(request.Payload.ToString());
+                return InsertStudent(student);
+            case "UPDATE":
+                var stuUpdate = JsonConvert.DeserializeObject<StudentPayload>(request.Payload.ToString());
+                return UpdateStudent(stuUpdate);
+            case "DELETE":
+                var stuDelete = JsonConvert.DeserializeObject<StudentPayload>(request.Payload.ToString());
+                return DeleteStudent(stuDelete);
+            default:
+                return "INVALID_ACTION";
+        }
+    }
+
+    static string ValidateLogin(LoginPayload login)
+    {
+        using var conn = new SqlConnection("YourConnectionStringHere");
+        conn.Open();
+        var cmd = new SqlCommand("SELECT COUNT(*) FROM Users WHERE Username=@u AND Password=@p", conn);
+        cmd.Parameters.AddWithValue("@u", login.Username);
+        cmd.Parameters.AddWithValue("@p", login.Password);
+        int count = (int)cmd.ExecuteScalar();
+        return count > 0 ? "LOGIN_SUCCESS" : "LOGIN_FAILED";
+    }
+
+    static string InsertStudent(StudentPayload s)
+    {
+        using var conn = new SqlConnection("YourConnectionStringHere");
+        conn.Open();
+        var cmd = new SqlCommand("INSERT INTO StudentData VALUES(@Id,@Name,@Email,@Sub,@Marks)", conn);
+        cmd.Parameters.AddWithValue("@Id", s.Id);
+        cmd.Parameters.AddWithValue("@Name", s.Name);
+        cmd.Parameters.AddWithValue("@Email", s.Email);
+        cmd.Parameters.AddWithValue("@Sub", s.Subject);
+        cmd.Parameters.AddWithValue("@Marks", s.Marks);
+        return cmd.ExecuteNonQuery() > 0 ? "INSERT_SUCCESS" : "INSERT_FAILED";
+    }
+
+    static string UpdateStudent(StudentPayload s)
+    {
+        using var conn = new SqlConnection("YourConnectionStringHere");
+        conn.Open();
+        var cmd = new SqlCommand("UPDATE StudentData SET Name=@Name, Email=@Email, Subject=@Sub, Marks=@Marks WHERE Id=@Id", conn);
+        cmd.Parameters.AddWithValue("@Id", s.Id);
+        cmd.Parameters.AddWithValue("@Name", s.Name);
+        cmd.Parameters.AddWithValue("@Email", s.Email);
+        cmd.Parameters.AddWithValue("@Sub", s.Subject);
+        cmd.Parameters.AddWithValue("@Marks", s.Marks);
+        return cmd.ExecuteNonQuery() > 0 ? "UPDATE_SUCCESS" : "UPDATE_FAILED";
+    }
+
+    static string DeleteStudent(StudentPayload s)
+    {
+        using var conn = new SqlConnection("YourConnectionStringHere");
+        conn.Open();
+        var cmd = new SqlCommand("DELETE FROM StudentData WHERE Id=@Id", conn);
+        cmd.Parameters.AddWithValue("@Id", s.Id);
+        return cmd.ExecuteNonQuery() > 0 ? "DELETE_SUCCESS" : "DELETE_FAILED";
+    }
+}
+
+///////////////////////////
+// WpfClientApp Project  //
+///////////////////////////
+
+// Add Reference to SharedModels
+
+// File: Services/TcpService.cs
+
+using System.Net.Sockets;
+using System.Text;
+using Newtonsoft.Json;
+
+public class TcpService
+{
+    public static string SendRequest(object request)
+    {
+        var json = JsonConvert.SerializeObject(request);
+        using TcpClient client = new TcpClient("127.0.0.1", 8888);
+        NetworkStream stream = client.GetStream();
+        byte[] data = Encoding.UTF8.GetBytes(json);
+        stream.Write(data, 0, data.Length);
+
+        byte[] buffer = new byte[4096];
+        int read = stream.Read(buffer, 0, buffer.Length);
+        return Encoding.UTF8.GetString(buffer, 0, read);
+    }
+}
+
+// File: ViewModels/LoginViewModel.cs
+
+using SharedModels;
+
+public class LoginViewModel
+{
+    public string Username { get; set; }
+    public string Password { get; set; }
+
+    public string Login()
+    {
+        var req = new Request
+        {
+            Action = "LOGIN",
+            Payload = new LoginPayload { Username = Username, Password = Password }
+        };
+        return TcpService.SendRequest(req);
+    }
+}
+
+// File: ViewModels/StudentViewModel.cs
+
+using SharedModels;
+
+public class StudentViewModel
+{
+    public StudentPayload Student { get; set; } = new StudentPayload();
+
+    public string Insert() => Send("INSERT");
+    public string Update() => Send("UPDATE");
+    public string Delete() => Send("DELETE");
+
+    private string Send(string action)
+    {
+        var req = new Request
+        {
+            Action = action,
+            Payload = Student
+        };
+        return TcpService.SendRequest(req);
+    }
+}
+
+// File: MainWindow.xaml.cs
+
+private void LoginButton_Click(object sender, RoutedEventArgs e)
+{
+    var vm = new LoginViewModel { Username = txtUser.Text, Password = txtPass.Password };
+    var result = vm.Login();
+    MessageBox.Show(result);
+    if (result == "LOGIN_SUCCESS")
+    {
+        StudentWindow win = new StudentWindow();
+        win.Show();
+        this.Close();
+    }
+}
+
+private void InsertButton_Click(object sender, RoutedEventArgs e)
+{
+    var vm = new StudentViewModel();
+    vm.Student.Id = int.Parse(txtId.Text);
+    vm.Student.Name = txtName.Text;
+    vm.Student.Email = txtEmail.Text;
+    vm.Student.Subject = txtSubject.Text;
+    vm.Student.Marks = int.Parse(txtMarks.Text);
+    MessageBox.Show(vm.Insert());
+}
+
+private void UpdateButton_Click(object sender, RoutedEventArgs e)
+{
+    var vm = new StudentViewModel();
+    vm.Student.Id = int.Parse(txtId.Text);
+    vm.Student.Name = txtName.Text;
+    vm.Student.Email = txtEmail.Text;
+    vm.Student.Subject = txtSubject.Text;
+    vm.Student.Marks = int.Parse(txtMarks.Text);
+    MessageBox.Show(vm.Update());
+}
+
+private void DeleteButton_Click(object sender, RoutedEventArgs e)
+{
+    var vm = new StudentViewModel();
+    vm.Student.Id = int.Parse(txtId.Text);
+    MessageBox.Show(vm.Delete());
+}
 
