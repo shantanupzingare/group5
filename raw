@@ -332,5 +332,25 @@ Unhandled exception. System.Data.SqlClient.SqlException (0x80131904): Invalid ob
    at TcpServer.Program.InsertStudent(Studentpayload s) in C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs:line 77
    at TcpServer.Program.HandleRequest(String json) in C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs:line 44
    at TcpServer.Program.Main() in C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs:line 26
+
+
+
+
+
+Severity	Code	Description	Project	File	Line	Suppression State
+Warning	CS8604	Possible null reference argument for parameter 'value' in 'Studentpayload? JsonConvert.DeserializeObject<Studentpayload>(string value)'.	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	43	Active
+Warning	CS8604	Possible null reference argument for parameter 'value' in 'Studentpayload? JsonConvert.DeserializeObject<Studentpayload>(string value)'.	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	46	Active
+Warning	CS8604	Possible null reference argument for parameter 'value' in 'Studentpayload? JsonConvert.DeserializeObject<Studentpayload>(string value)'.	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	49	Active
+Warning	CS8604	Possible null reference argument for parameter 'value' in 'LoginPayload? JsonConvert.DeserializeObject<LoginPayload>(string value)'.	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	40	Active
+Warning	CS8604	Possible null reference argument for parameter 's' in 'string Program.UpdateStudent(Studentpayload s)'.	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	47	Active
+Warning	CS8604	Possible null reference argument for parameter 's' in 'string Program.InsertStudent(Studentpayload s)'.	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	44	Active
+Warning	CS8604	Possible null reference argument for parameter 's' in 'string Program.DeleteStudent(Studentpayload s)'.	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	50	Active
+Warning	CS8604	Possible null reference argument for parameter 'login' in 'string Program.ValidateLogin(LoginPayload login)'.	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	41	Active
+Warning	CS8602	Dereference of a possibly null reference.	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	37	Active
+Warning	CS8602	Dereference of a possibly null reference.	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	40	Active
+Warning	CS8602	Dereference of a possibly null reference.	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	43	Active
+Warning	CS8602	Dereference of a possibly null reference.	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	46	Active
+Warning	CS8602	Dereference of a possibly null reference.	TcpServer	C:\Users\Shantanu\source\repos\TcpServer\TcpServer\Program.cs	49	Active
+
 ClientConnectionId:733c4d0f-72f9-4a2e-a639-95a694744163
 Error Number:208,State:1,Class:16
