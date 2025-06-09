@@ -460,5 +460,37 @@ Error Number:208,State:1,Class:16
                         Background="#dc3545" Foreground="White" FontWeight="Bold" BorderBrush="#dc3545"/>
             </StackPanel>
         </StackPanel>
+
+
+
+
+
+
+static string InsertStudent(StudentPayload s)
+{
+    using var conn = new SqlConnection("YourConnectionStringHere");
+    conn.Open();
+
+    // ✅ CHANGED: Using MERGE for UPSERT
+    var cmd = new SqlCommand(@"
+        MERGE INTO StudentData AS target
+        USING (SELECT @Id AS Id, @Name AS Name, @Email AS Email, @Sub AS Subject, @Marks AS Marks) AS source
+        ON target.Id = source.Id
+        WHEN MATCHED THEN 
+            UPDATE SET Name = source.Name, Email = source.Email, Subject = source.Subject, Marks = source.Marks
+        WHEN NOT MATCHED THEN
+            INSERT (Id, Name, Email, Subject, Marks)
+            VALUES (source.Id, source.Name, source.Email, source.Subject, source.Marks);", conn); // ✅ CHANGED
+
+    // ✅ SAME: Parameters added as before
+    cmd.Parameters.AddWithValue("@Id", s.Id);
+    cmd.Parameters.AddWithValue("@Name", s.Name);
+    cmd.Parameters.AddWithValue("@Email", s.Email);
+    cmd.Parameters.AddWithValue("@Sub", s.Subject);
+    cmd.Parameters.AddWithValue("@Marks", s.Marks);
+
+    return cmd.ExecuteNonQuery() > 0 ? "INSERT_OR_UPDATE_SUCCESS" : "INSERT_OR_UPDATE_FAILED"; // ✅ CHANGED
+}
+
     </Border>
 </Window>
