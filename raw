@@ -454,3 +454,34 @@ that error is occcuring what is the reason and how to solve it
 
 Severity	Code	Description	Project	File	Line	Suppression State
 Error	CS0029	Cannot implicitly convert type 'char' to 'Sharemodel.Studentpayload'	UserInterface	C:\Users\Shantanu\source\repos\UserInterface\UserInterface\StudentWindow.xaml.cs	68	Active
+
+
+
+private void FetchButton_Click(object sender, RoutedEventArgs e)
+{
+    var vm = new StudentViewModel();
+    string jsonResponse = vm.Fetch();
+
+    try
+    {
+        var studentList = JsonConvert.DeserializeObject<List<Sharemodel.Studentpayload>>(jsonResponse);
+
+        if (studentList != null)
+        {
+            Students.Clear();
+            foreach (var s in studentList)
+            {
+                Students.Add(new StudentViewModel { Student = s });
+            }
+            MessageBox.Show("Data fetched successfully!");
+        }
+        else
+        {
+            MessageBox.Show("No student data received.");
+        }
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show($"Error parsing student data: {ex.Message}");
+    }
+}
