@@ -1,3 +1,184 @@
+namespace Sharemodel
+{
+    public class Request
+    {
+        public string? Action { get; set; }
+        public object? Payload { get; set; }
+    }
+    public class LoginPayload
+    {
+        public string? Username { get; set; }
+        public string? Password { get; set; }
+    }
+    public class Studentpayload
+    {
+        public int? Id { get; set; }
+        public string? Name { get; set; }
+        public string? Email { get; set; }
+        public string? Subject { get; set; }
+        public int? Marks { get; set; }
+    }
+}
+
+
+
+using System.Net.Sockets;
+using System.Text;
+using Newtonsoft.Json;
+
+namespace UserInterface.Services
+{
+    public class TcpService
+    {
+        public static string SendRequest(object request)
+        {
+            var json = JsonConvert.SerializeObject(request);
+            using TcpClient client = new TcpClient("127.0.0.1", 8888);
+            NetworkStream stream = client.GetStream();
+            byte[] data = Encoding.UTF8.GetBytes(json);
+            stream.Write(data, 0, data.Length);
+
+            byte[] buffer = new byte[4096];
+            int read = stream.Read(buffer, 0, buffer.Length);
+            return Encoding.UTF8.GetString(buffer, 0, read);
+        }
+    }
+}
+
+
+
+using Sharemodel;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using UserInterface.Services;
+
+namespace UserInterface.ViewModels
+{
+   public class LoginViewModel
+{
+    public string? Username { get; set; }
+    public string? Password { get; set; }
+
+    public string Login()
+    {
+        var req = new Request
+        {
+            Action = "LOGIN",
+            Payload = new LoginPayload { Username = Username, Password = Password }
+        };
+        return TcpService.SendRequest(req);
+    }
+}
+}
+
+
+
+using Sharemodel;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using UserInterface.Services;
+
+namespace UserInterface.ViewModels
+{
+    public class StudentViewModel
+   {
+    public Studentpayload Student { get; set; } = new Studentpayload();
+
+    public string Insert() => Send("INSERT");
+    public string Update() => Send("UPDATE");
+    public string Delete() => Send("DELETE");
+
+        public string Fetch() => Send("FETCH");
+
+    private string Send(string action)
+    {
+        var req = new Request
+        {
+            Action = action,
+            Payload = Student
+        };
+        return TcpService.SendRequest(req);
+    }
+}
+
+}
+
+
+
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Navigation;
+using System.Windows.Shapes;
+using UserInterface.ViewModels;
+
+namespace UserInterface
+{
+    /// <summary>
+    /// Interaction logic for MainWindow.xaml
+    /// </summary>
+    public partial class MainWindow : Window
+    {
+        public MainWindow()
+        {
+            InitializeComponent();
+        }
+        private void LoginButton_Click(object sender, RoutedEventArgs e)
+        {
+            var vm = new LoginViewModel { Username = txtUser.Text, Password = txtPass.Password };
+            var result = vm.Login();
+            MessageBox.Show(result);
+            if (result == "LOGIN_SUCCESS")
+            {
+                StudentWindow win = new StudentWindow();
+                win.Show();
+                this.Close();
+            }
+        }
+    }
+}
+
+
+<Window x:Class="UserInterface.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Login" Height="330" Width="350" Background="#f7f7f7"
+        WindowStartupLocation="CenterScreen">
+    <Border BorderBrush="#ccc" BorderThickness="1" CornerRadius="10" Margin="10" Padding="20" Background="White">
+        <StackPanel>
+            <TextBlock Text="Login" FontSize="20" FontWeight="Bold" Margin="0,0,0,15" HorizontalAlignment="Center" Foreground="#333"/>
+
+            <TextBlock Text="Username" FontWeight="SemiBold" Foreground="#666" Margin="0,5,0,2"/>
+            <TextBox x:Name="txtUser" Height="30" FontSize="14" Padding="5" Background="#fafafa" BorderBrush="#ccc" BorderThickness="1"/>
+
+            <TextBlock Text="Password" FontWeight="SemiBold" Foreground="#666" Margin="0,10,0,2"/>
+            <PasswordBox x:Name="txtPass" Height="30" FontSize="14" Padding="5" Background="#fafafa" BorderBrush="#ccc" BorderThickness="1"/>
+
+            <Button Content="Login" Click="LoginButton_Click" Height="35" Margin="0,20,0,0"
+                    Background="#0078D7" Foreground="White" FontWeight="Bold" BorderBrush="#0078D7"/>
+        </StackPanel>
+    </Border>
+</Window>
+
+
+
+
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -136,3 +317,29 @@ namespace UserInterface
         </StackPanel>
     </Border>
 </Window>
+
+
+
+
+using System.Net.Sockets;
+using System.Text;
+using Newtonsoft.Json;
+
+namespace UserInterface.Services
+{
+    public class TcpService
+    {
+        public static string SendRequest(object request)
+        {
+            var json = JsonConvert.SerializeObject(request);
+            using TcpClient client = new TcpClient("127.0.0.1", 8888);
+            NetworkStream stream = client.GetStream();
+            byte[] data = Encoding.UTF8.GetBytes(json);
+            stream.Write(data, 0, data.Length);
+
+            byte[] buffer = new byte[4096];
+            int read = stream.Read(buffer, 0, buffer.Length);
+            return Encoding.UTF8.GetString(buffer, 0, read);
+        }
+    }
+}
