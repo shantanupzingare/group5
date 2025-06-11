@@ -9553,12 +9553,2368 @@ namespace LoginSignupCore.Models
 
 
 
+using System;
+using System.Collections.Generic;
+
+namespace LoginSignupCore.Models;
+
+public partial class AgentSiteMonitoringData
+{
+    public int Id { get; set; }
+
+    public int IntBrokerId { get; set; }
+
+    public int IntSiteId { get; set; }
+
+    public int IntAttributeType { get; set; }
+
+    public int? IntComponentId { get; set; }
+
+    public int? IntInstanceId { get; set; }
+
+    public int? IntParameterId { get; set; }
+
+    public string? NvcComponentName { get; set; }
+
+    public string NvcValue { get; set; } = null!;
+
+    public DateTime DtmTimestamp { get; set; }
+
+    public bool BitIsActive { get; set; }
+
+    public bool BitIsDelete { get; set; }
+}
+
+
+namespace LoginSignupCore.Models
+{
+    public class AgentwiseFiles
+    {
+        public int Id { get; set; }
+        public int AgentId { get; set; }
+        public string AgentName { get; set; }
+        public int BrokerId { get; set; }
+        public int SiteId { get; set; }
+        public int FileId { get; set; }
+        public string FileName { get; set; }
+        public int IsActive { get; set; }
+
+        public int IsDeleted { get; set; }
+
+        public int IntCreatedBy { get; set; }
+
+        public DateTime DtmCreationDate { get; set; }
+
+        public int? IntUpdatedBy { get; set; }
+
+        public DateTime DtmUpdationDate { get; set; }
+        public string Remarks { get; set; }
+    }
+}
+
+
+
+
+namespace LoginSignupCore.Models
+{
+    public class AgentwiseFileViewModel
+    {
+        public List<AgentwiseFiles> Files { get; set; } = new List<AgentwiseFiles>();
+        public AgentwiseFiles File { get; set; } = new AgentwiseFiles();
+    }
+}
+
+
+
+
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
+
+namespace LoginSignupCore.Models { 
+   
+    [Table("AlertThreshold")]
+    public partial class AlertThreshold
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        [Column("id")]
+        public int Id { get; set; }
+
+        [Column("intParamID")]
+        public int IntParamId { get; set; }
+
+        [Column("intComponentId")]
+        public int? IntComponentId { get; set; }
+
+        [StringLength(64)]
+        public string? ComponentName { get; set; }
+
+        [Column("BrokerSiteID")]
+        [StringLength(16)]
+        public string? BrokerSiteId { get; set; }
+
+        [Column("intThresholdValue")]
+        public int IntThresholdValue { get; set; }
+
+        [Column("intCreatedBy")]
+        public int IntCreatedBy { get; set; }
+
+        [Column("dtmCreatedOn")]
+        public DateTime DtmCreatedOn { get; set; }
+
+        [Column("iniUpdatedBy")]
+        public int? IniUpdatedBy { get; set; }
+
+        [Column("dtmUpdatedOn")]
+        public DateTime? DtmUpdatedOn { get; set; }
+
+        [Required]
+        [Column("bitIsActive")]
+        public int BitIsActive { get; set; }
+
+        [Column("bitIsDelete")]
+        public int BitIsDelete { get; set; }
+
+        //[NotMapped]
+
+        //public string intParamIdstring { get; set; }
+
+        //[StringLength(3)]
+        //[Unicode(false)]
+        //public string ComponentId { get; set; }
+        //[StringLength(64)]
+        //public string ParameterName { get; set; }
+
+    }
+}
+
+
+
+using LoginSignupCore.MasterCache;
+using System.Text.Json.Serialization;
+
+namespace LoginSignupCore.Models
+{
+    public class BODUploadComponent
+    {
+        
+        public MasterCache.Component component { get; set; } = new MasterCache.Component();
+        public List<LoginSignupCore.MasterCache.Component> Components { get; set; } = new List<MasterCache.Component>();
+    }
+}
+
+
+
+using LoginSignupCore.MasterCache;
+
+namespace LoginSignupCore.Models
+{
+    public class BODUploadFileView
+    {
+        public FileMasterInfo fileMasterInfo { get; set; } = new FileMasterInfo();
+        public List<FileMasterInfo> fileMastersInfo { get; set; } = new List<FileMasterInfo>();
+    }
+}
+
+
+using System;
+using System.Collections.Generic;
+
+namespace LoginSignupCore.Models;
+
+public partial class BrokerMaster
+{
+    public int Id { get; set; }
+
+    public string? NvcBrokerName { get; set; }
+
+    public int IsActive { get; set; }
+
+    public int IsDeleted { get; set; }
+
+    public int IntCreatedBy { get; set; }
+
+    public DateTime DtmCreationDate { get; set; }
+
+    public int? IntUpdatedBy { get; set; }
+
+    public DateTime DtmUpdationDate { get; set; }
+}
+
+
+
+using System;
+using System.Collections.Generic;
+
+namespace LoginSignupCore.Models;
+
+public partial class BrokerSiteCredentials
+{
+    public int Id { get; set; }
+
+    public int IntBrokerId { get; set; }
+
+    public int IntSiteId { get; set; }
+
+    public string? NvcWebSocketToken { get; set; }
+
+    public string? NvcComment { get; set; }
+
+    public int IsActive { get; set; }
+
+    public int IsDelete { get; set; }
+}
+
+
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+
+namespace LoginSignupCore.Models;
+
+public partial class BrokerSites
+{
+    public int Id { get; set; }
+    [Required(ErrorMessage = "Please Enter Site Name")]
+    public string NvcSiteName { get; set; } = null!;
+    [Required(ErrorMessage = "Please Enter MasterFilePath Name")]
+    public string NvcMasterFilePath { get; set; } = null!;
+
+    public int IntBrokerId { get; set; }
+
+    public int IsActive { get; set; }
+
+    public int IsDeleted { get; set; }
+
+    public int IntCreatedBy { get; set; }
+
+    public DateTime? DtmCreationDate { get; set; }
+
+    public int? IntUpdatedBy { get; set; }
+
+    public DateTime? DtmUpdationDate { get; set; }
+}
+
+
+
+namespace LoginSignupCore.Models
+{
+    public class BrokerSitesModel
+    {
+        public int Id { get; set; }
+
+        public string NvcSiteName { get; set; } = null!;
+        public string NvcMasterFilePath { get; set; } = null!;
+
+        public string BrokerName { get; set; } = null!;
+        public int IntBrokerId { get; set; }
+
+        public int IsActive { get; set; }
+
+        public int IsDeleted { get; set; }
+
+        public int IntCreatedBy { get; set; }
+
+        public DateTime? DtmCreationDate { get; set; }
+
+        public int? IntUpdatedBy { get; set; }
+
+        public DateTime? DtmUpdationDate { get; set; }
+    }
+}
+
+
+
+namespace LoginSignupCore.Models
+{
+    public class BrokerView
+    {
+        public List<BrokerMaster> brokers { get; set; } = new List<BrokerMaster>();
+
+        public BrokerMaster broker { get; set; } = new BrokerMaster();
+    }
+}
+
+
+
+
+using System.ComponentModel.DataAnnotations;
+
+namespace LoginSignupCore.Models
+{
+    public class Component
+    {
+        public int Id { get; set; }
+        public int AgentId { get; set; }
+        public int BrokerId { get; set; }
+        public int SiteId { get; set; }
+        public string? ComponentName { get; set; }
+        public string? AgentName { get; set; }
+        public int ComponentType { get; set; }
+        public int InstanceId { get; set; }
+        [Required(ErrorMessage = "ExePath required")]
+        public string ExePath { get; set; }
+        public string? CmdParam { get; set; }
+        public Boolean IsRunAsService { get; set; }
+        public string ServiceName { get; set; }
+        
+        public int Priority { get; set; }
+        public int IsActive { get; set; }
+
+        public int IsDeleted { get; set; }
+
+        public int IntCreatedBy { get; set; }
+
+        public DateTime DtmCreationDate { get; set; }
+
+        public int? IntUpdatedBy { get; set; }
+
+        public DateTime DtmUpdationDate { get; set; }
+        public string Remarks { get; set; }
+
+        public List<ComponentDropDown> com { get; set; }    = new List<ComponentDropDown>();
+    }
+}
+
+
+namespace LoginSignupCore.Models
+{
+    public class ComponentDropDown
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public int Priority { get; set; }
+    }
+}
+
+
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace LoginSignupCore.Models;
+
+public partial class ComponentMaster
+{
+    public int Id { get; set; }
+
+    public int IntComponentId { get; set; }
+
+    [Required(ErrorMessage = "Please Component Name")]
+    public string NvcComponentName { get; set; }
+    [Required(ErrorMessage = "Please CpuThreshold required")]
+    public double CpuThreshold { get; set; }
+
+    [Required(ErrorMessage = "please RamThreshold required")]
+    public double RamThreshold { get; set; }
+    [Range(1,int.MaxValue,ErrorMessage = "Please set Priority | Can't be zero")]
+    public int IntPriority { get; set; }
+    public DateTime DtmCreatedOn { get; set; }
+
+    public int? IntCreatedBy { get; set; }
+
+    public DateTime? DtmUpdatedOn { get; set; }
+
+    public int? IntUpdatedBy { get; set; }
+
+    public int BitIsActive { get; set; }
+
+    public int BitIsDelete { get; set; }
+    
+    public List<ComponentMaster> Components = new List<ComponentMaster>();
+}
+
+
+
+namespace LoginSignupCore.Models
+{
+    public class ComponentModel
+    {
+        public Component component { get; set; } = new Component();
+        public List<ComponentDropDown> list { get; set; } = new List<ComponentDropDown>();
+    }
+}
+
+
+
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
+
+namespace LoginSignupCore.Models
+{
+    [Table("ComponentParameter")]
+    public partial class ComponentParameter
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        [Column("ParamId")]
+        public int ParamId { get; set; }
+
+        [StringLength(3)]
+        [Unicode(false)]
+        public string ComponentId { get; set; }
+
+        [StringLength(3)]
+        [Unicode(false)]
+        public string InstanceId { get; set; }
+
+        [StringLength(64)]
+        public string ParameterName { get; set; }
+
+        [StringLength(256)]
+        public string Remarks { get; set; }
+
+        [Column("dtmCreatedOn", TypeName = "datetime")]
+        public DateTime? DtmCreatedOn { get; set; }
+
+        [Column("intCreatedBy")]
+        public int IntCreatedBy { get; set; }
+
+        [Column("dtmUpdatedOn", TypeName = "datetime")]
+        public DateTime? DtmUpdatedOn { get; set; }
+
+        [Column("intUpdatedBy")]
+        public int IntUpdatedBy { get; set; }
+
+        [Column("bitIsActive")]
+        public int BitIsActive { get; set; }
+
+        [Column("bitIsDelete")]
+        public int BitIsDelete { get; set; }
+
+        [Required]
+        [Column("bitAttributeType")]
+        public int BitAttributeType { get; set; }
+
+        [Column("brokerSiteId")]
+        public string BrokerSiteId { get; set; }
+
+        //public string ParamIdForList { get { return ParamId + " - " + ParameterName; } }
+    }
+}
+
+
+
+namespace LoginSignupCore.Models
+{
+    public class ComponentViewModel
+    {
+        public List<Component> Components { get; set; } = new List<Component>();
+        public Component Component { get; set; } = new Component();
+    }
+}
+
+
+
+using LoginSignupCore.Models.Response;
+
+namespace LoginSignupCore.Models
+{
+    public class ComponentViewStatus
+    {
+
+        public int BrokerId;
+
+        public int SiteId;
+       // public ComponentStatus componentStatus { get; set; } = new ComponentStatus();
+        public List<ComponentStatus> ComponentsStatus { get; set; } = new List<ComponentStatus>();
+    }
+}
+
+
+
+using System;
+using System.Collections.Generic;
+using Microsoft.EntityFrameworkCore;
+
+namespace LoginSignupCore.Models;
+
+public partial class CtclContext : DbContext
+{
+    public CtclContext(DbContextOptions<CtclContext> options)
+        : base(options)
+    {
+    }
+
+    public virtual DbSet<BrokerSiteCredentials> BrokerSiteCredentials { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<BrokerSiteCredentials>(entity =>
+        {
+            entity.HasNoKey();
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.IntBrokerId).HasColumnName("intBrokerId");
+            entity.Property(e => e.IntSiteId).HasColumnName("intSiteId");
+            entity.Property(e => e.IsActive).HasDefaultValueSql("((1))");
+            entity.Property(e => e.NvcComment).HasColumnName("nvcComment");
+            entity.Property(e => e.NvcWebSocketToken).HasColumnName("nvcWebSocketToken");
+        });
+
+        OnModelCreatingPartial(modelBuilder);
+    }
+
+    partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
+}
+
+
+
+using Microsoft.EntityFrameworkCore;
+using System;
+using System.Collections.Generic;
+
+namespace LoginSignupCore.Models;
+[Keyless]
+public partial class CTCLTimer
+{
+    public int? TimerinMins { get; set; }
+}
+
+
+
+namespace LoginSignupCore.Models
+{
+    public class DictionaryOfTreeViewModl
+    {
+        public Dictionary<int, List<TreeViewNode>> MenuItem { get; set; }
+        public Dictionary<int, string> BokerName { get; set; }
+    }
+}
+
+
+
+namespace LoginSignupCore.Models
+{
+	public class ErrorViewModel
+	{
+		public string? RequestId { get; set; }
+
+		public bool ShowRequestId => !string.IsNullOrEmpty(RequestId);
+	}
+}
+
+
+namespace LoginSignupCore.Models
+{
+    public class FileDropDown
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+
+    }
+}
+
+
+
+using CTCL.BinaryProtocol.Common.CTCL.Enum;
+using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
+
+namespace LoginSignupCore.Models
+{
+    public class FileMaster
+    {
+        public int id { get; set; }
+        public CTCL_ExchangeIdentifier SegmentId { get; set; }
+        public int FileType { get; set; }
+        [Required (ErrorMessage ="file is not find")]
+        public string FileName { get; set; }
+        public int Priority { get; set; }
+        public bool UploadBeforeBod { get; set; }
+        public string nvcDestinationPath { get; set; }
+        public int isActive { get; set; }
+        public int isDeleted { get; set; }
+        public string Remarks { get; set; }
+        public DateTime? IntCreatedOn { get; set; }
+        public int IntCreatedBy { get; set; }
+
+        public DateTime? UpdatedOn { get; set; }
+        public int UpdatedBy { get; set; }
+    }
+}
+
+
+
+using LoginSignupCore.Models.Response;
+
+namespace LoginSignupCore.Models
+{
+    public class FileStatusView
+    {
+        public FileStatus file { get; set; } = new FileStatus();
+        public List<FileStatus> fileStatus { get; set; } = new List<FileStatus>();
+    }
+}
+
+
+
+
+namespace LoginSignupCore.Models
+{
+    public class FilesViewModel
+    {
+        public AgentwiseFiles file { get; set; } = new AgentwiseFiles();
+        public List<FileDropDown> list { get; set; } = new List<FileDropDown>();
+    }
+}
+
+
+
+namespace LoginSignupCore.Models
+{
+    public class FileViewModel
+    {
+        public List<FileMaster> files { get; set; }  = new List<FileMaster>();
+
+        public FileMaster file { get; set; } = new FileMaster();
+    }
+}
+
+
+using DotNetty.Transport.Channels;
+
+namespace LoginSignupCore.Models
+{
+    public class globals
+    {
+        public static int User_ID;
+        public static string Broker_Site = "Please Select";
+        public static string Component_Name = "Please Select";
+        public static int Component_ID;
+        public static string componentname;
+        public static string BrokerIdList;
+        public static int BrokerId;
+        public static string BrokerId_update;
+        public static string Instance_id;
+        public static string BrokerName;
+        public static int IsActive;
+        public static string Instance_Name = "Please Select";
+        public static string Parameter_Name = "Please Select";
+        public static int Timer = 0;
+    }
+}
+
+
+
+using Microsoft.EntityFrameworkCore;
+using System;
+using System.Collections.Generic;
+
+namespace LoginSignupCore.Models;
+[Keyless]
+public partial class InfoMaster
+{
+    public int IntInfoId { get; set; }
+
+    public int IntBrokerId { get; set; }
+
+    public int IntSiteId { get; set; }
+
+    public int IntComponentId { get; set; }
+
+    public int IntInstanceId { get; set; }
+
+    public int IntParamId { get; set; }
+
+    public DateTime DtmCreatedOn { get; set; }
+
+    public int? IntCreatedBy { get; set; }
+
+    public DateTime? DtmUpdatedOn { get; set; }
+
+    public int? IntUpdatedBy { get; set; }
+
+    public int BitIsActive { get; set; }
+
+    public int BitIsDelete { get; set; }
+
+    public int ParamAttribute { get; set; }
+
+    public int BrokerSiteInstanceId { get; set; }
+
+    public DateTime? DtmTimestamp { get; set; }
+}
+
+
+
+using Microsoft.EntityFrameworkCore;
+using System;
+using System.Collections.Generic;
+
+namespace LoginSignupCore.Models;
+[Keyless]
+public partial class InfoStatistics
+{
+    public int IntInfoId { get; set; }
+
+    public int IntBrokerId { get; set; }
+
+    public int IntSiteId { get; set; }
+
+    public int IntComponentId { get; set; }
+
+    public int IntInstanceId { get; set; }
+
+    public int IntParamId { get; set; }
+
+    public string? NvcReference { get; set; }
+
+    public string? NvcValue { get; set; }
+
+    public DateTime DtmCreatedOn { get; set; }
+
+    public int? IntCreatedBy { get; set; }
+
+    public DateTime? DtmUpdatedOn { get; set; }
+
+    public int? IntUpdatedBy { get; set; }
+
+    public int BitIsActive { get; set; }
+
+    public int BitIsDelete { get; set; }
+
+    public DateTime? DtmTimeStamp { get; set; }
+}
+
+
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
+
+namespace LoginSignupCore.Models;
+
+
+[Table("InstanceMaster")]
+public partial class InstanceMaster
+{
+    [Key]
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    [Column("intInstanceId")]
+    public int IntInstanceId { get; set; }
+
+    [Column("intComponentId")]
+    public int IntComponentId { get; set; }
+
+    [Column("nvcInstanceName")]
+    [StringLength(64)]
+    public string? NvcInstanceName { get; set; }
+
+    [Column("nvcInstanceIP")]
+    [StringLength(64)]
+    public string? NvcInstanceIp { get; set; }
+
+    [Column("intPort")]
+    [StringLength(15)]
+    public string? IntPort { get; set; }
+
+    [Column("dtmCreatedOn")]
+    public DateTime DtmCreatedOn { get; set; }
+
+    [Column("intCreatedBy")]
+    public int? IntCreatedBy { get; set; }
+
+    [Column("dtmUpdatedOn")]
+    public DateTime? DtmUpdatedOn { get; set; }
+
+    [Column("intUpdatedBy")]
+    public int? IntUpdatedBy { get; set; }
+
+    [Column("bitIsActive")]
+    public int BitIsActive { get; set; }
+
+    [Column("bitIsDelete")]
+    public int BitIsDelete { get; set; }
+
+    [Column("dtmStartDate")]
+    public DateTime DtmStartDate { get; set; }
+
+    [Column("dtmEndDate")]
+    public DateTime? DtmEndDate { get; set; }
+
+    public int? VersionNo { get; set; }
+
+    public int? CapacityWeightage { get; set; }
+
+    [Column("nvcBrokerSiteId")]
+    public string NvcBrokerSiteId { get; set; }
+}
+
+
+
+using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace LoginSignupCore.Models
+{
+	public class RegisterViewModel
+	{
+		[Key]
+		[DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+		public int Id { get; set; }
+		[Required]
+		public string firstName { get; set; }
+		[Required] 
+		public string lastName { get; set; }
+
+		[Required]
+		[EmailAddress]
+		public string Email { get; set; }
+
+		[Required]
+		[DataType(DataType.Password)]
+		public string Password { get; set; }
+        [Required]
+        [DataType(DataType.Password)]
+		[Compare("Password", ErrorMessage ="not match")]
+        public string ConfirmPassword { get; set; }
+
+	}
+}
+
+
+
+namespace LoginSignupCore.Models
+{
+    public class SiteViewModel
+    {
+        public List<BrokerSites> sites { get; set; }
+        public string brokerName { get; set; }
+    }
+}
+
+using LoginSignupCore.MasterCache;
+using LoginSignupCore.Models.Response;
+
+namespace LoginSignupCore.Models
+{
+    public class TechnicalInfo
+    {
+        public ComponentsTechnicalInfo technicalInfo { get; set; } = new ComponentsTechnicalInfo();
+        public List<ComponentsTechnicalInfo> technicalInfos { get; set; } = new List<ComponentsTechnicalInfo>();
+    }
+}
+
+
+
+using LoginSignupCore.MasterCache;
+
+namespace LoginSignupCore.Models
+{
+    public class TechnicalInfoViewModel
+    {
+        public int BrokerId;
+        public int SiteId;
+
+        //public ComponentsTechnicalInfo Info { get; set; } = new ComponentsTechnicalInfo();
+        public List<ComponentsTechnicalInfo> TechnicalInfos { get; set; } = new List<ComponentsTechnicalInfo>();
+    }
+}
+
+
+namespace LoginSignupCore.Models
+{
+    public class TreeViewNode
+    {
+        public int id { get; set; } //brokerid
+        public int cid { get; set; } //cityid
+        public string parent { get; set; }
+        public string text { get; set; }
+    }
+}
+
+
+using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
+
+namespace LoginSignupCore.Models
+{
+    public class User
+    {
+        [DefaultValue (0)]
+        public int Id { get; set; }
+
+        [Required (ErrorMessage ="Please enter a valid email address")]
+        [EmailAddress]
+        public string Email { get; set; }
+
+        [Required(ErrorMessage = "Please enter a password")]
+        [DataType(DataType.Password)]
+        public string Password { get; set; }
+
+        public bool KeepLoggedin { get; set; }
+    }
+}
+
+
+
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
+
+namespace LoginSignupCore.Models;
+
+public partial class UserloginCred
+{
+    [Key]
+    [Column("id")]
+    public int Id { get; set; }
+
+    [Column("admin")]
+    [StringLength(50)]
+    public string Admin { get; set; } = null!;
+
+    [Column("password")]
+    [StringLength(50)]
+    public string Password { get; set; } = null!;
+}
+
+
+
+using Microsoft.EntityFrameworkCore;
+
+namespace LoginSignupCore.Models;
+[Keyless]
+public partial class VwAlertThreshold
+{
+    public int Id { get; set; }
+
+    public int IntParamId { get; set; }
+
+    public int? IntComponentId { get; set; }
+
+    public string? ComponentName { get; set; }
+
+    public string? BrokerSiteName { get; set; }
+
+    public string? BrokerSiteId { get; set; }
+
+    public int IntThresholdValue { get; set; }
+
+    public string? ParameterName { get; set; }
+
+    public int? ParamId { get; set; }
+
+    public int BitIsActive { get; set; }
+}
+
+
+
+using Microsoft.EntityFrameworkCore;
+using System;
+using System.Collections.Generic;
+
+namespace LoginSignupCore.Models;
+[Keyless]
+public partial class VwComponentInstanceBrokerWiseData
+{
+    
+    public string? Segment { get; set; }
+
+    public int? Intcomponentid { get; set; }
+
+    public string? NvccomponentName { get; set; }
+
+    public int? IntinstanceId { get; set; }
+
+    public string? NvcInstanceName { get; set; }
+
+    public string? NvcInstanceIp { get; set; }
+
+    public string? IntPort { get; set; }
+
+    public string? BrokerName { get; set; }
+
+    public string? VarBrokerId { get; set; }
+
+    public int? IntTraderId { get; set; }
+
+    public string? NvcGripAddress { get; set; }
+
+    public string? NvcLocalIpaddress { get; set; }
+
+    public int? IntGportNo { get; set; }
+
+    public int? IntLocalPortNo { get; set; }
+
+    public int? SmiBoxId { get; set; }
+
+    public int? KeepAliveTimeout { get; set; }
+
+    public int? LineThresholdThrottle { get; set; }
+}
+
+
+using Microsoft.EntityFrameworkCore;
+using System;
+using System.Collections.Generic;
+
+namespace LoginSignupCore.Models;
+[Keyless]
+public partial class VwComponentParameter
+{
+    public string? Intcomponentid { get; set; }
+
+    public string? NvccomponentName { get; set; }
+
+    public string? Intinstanceid { get; set; }
+
+    public string? NvcInstanceName { get; set; }
+
+    public string? BrokerSiteName { get; set; }
+
+    public int VarBrokerId { get; set; }
+
+    public int? ParamId { get; set; }
+
+    public string? ParameterName { get; set; }
+
+    public int? IntSiteId { get; set; }
+
+    public string? NvcBrokerName { get; set; }
+
+    public string? NvcSiteName { get; set; }
+
+    public string? BrokerSiteId { get; set; }
+
+    public int BitAttributeType { get; set; }
+
+    public int BitIsActive { get; set; }
+
+    public string? Remarks { get; set; }
+}
+
+
+
+using Microsoft.EntityFrameworkCore;
+using System;
+using System.Collections.Generic;
+
+namespace LoginSignupCore.Models;
+[Keyless]
+public partial class VwInfoStatsData
+{
+    public string? Intcomponentid { get; set; }
+
+    public string? NvccomponentName { get; set; }
+
+    public string? Intinstanceid { get; set; }
+
+    public string? NvcInstanceName { get; set; }
+
+    public string? NvcInstanceIp { get; set; }
+
+    public string? IntPort { get; set; }
+
+    public string? BrokerName { get; set; }
+
+    public int VarBrokerId { get; set; }
+
+    public int? ParamId { get; set; }
+
+    public string? ParameterName { get; set; }
+
+    public string? NvcReference { get; set; }
+
+    public string? NvcValue { get; set; }
+
+    public int? IntSiteId { get; set; }
+
+    public string? NvcSiteName { get; set; }
+
+    public DateTime? DtmTimestamp { get; set; }
+}
+
+
+
+
+using Microsoft.EntityFrameworkCore;
+
+namespace LoginSignupCore.Models;
+[Keyless]
+public partial class VwInstanceMaster
+{
+    public int IntInstanceId { get; set; }
+
+    public int IntComponentId { get; set; }
+
+    public string? NvcInstanceName { get; set; }
+
+    public string? NvcInstanceIp { get; set; }
+
+    public string? IntPort { get; set; }
+
+    public DateTime DtmCreatedOn { get; set; }
+
+    public int? IntCreatedBy { get; set; }
+
+    public DateTime? DtmUpdatedOn { get; set; }
+
+    public int? IntUpdatedBy { get; set; }
+
+    public int? BitIsActive { get; set; }
+
+    public int? BitIsDelete { get; set; }
+
+    public DateTime DtmStartDate { get; set; }
+
+    public DateTime? DtmEndDate { get; set; }
+
+    public int? VersionNo { get; set; }
+
+    public int? CapacityWeightage { get; set; }
+
+    public string? NvcComponentName { get; set; }
+
+    public string? NvcBrokerSiteId { get; set; }
+
+    public string? NvcBrokerSiteName { get; set; }
+}
+
+
+//using ConsumerDBComponent.Common;
+using CTCL.BinaryProtocol.Common.CMA.DBWrite.EntityModels;
+using System.Data;
+using System.Data.SqlClient;
+using Response = BinaryProtocol.Common.Response;
+using StatusCode = BinaryProtocol.Common.StatusCode;
+using Log = LoginSignupCore.Global.Log;
+using CTCL.BinaryProtocol.Common.CTCL.DBWrite.EntityModels;
+using LoginSignupCore.Global;
+//using InfoMaster = LoginSignupCore.Models.InfoMaster;
+
+namespace LoginSignupCore.Processor
+{
+    public class CMA_InfoMasterMessageProcessor
+    {
+        private SqlConnection? PersistSqlConn;
+        private SqlTransaction? tran;
+        public Response processInfoMasterData(InfoMaster infoMasterMasterObj)
+        {
+            CTCL_CommonMasterAttributes cTCL_CommonMasterAttributes = new CTCL_CommonMasterAttributes();
+            Response response = new Response();
+            try
+            {
+                DataTable dt = new DataTable();
+                // Adding Columns
+                //
+                DataColumn COLUMN = new DataColumn();
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "intBrokerId";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "intSiteId";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "intComponentId";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "intInstanceId";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "intParamId";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "ParamAttribute";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "BrokerSiteInstanceId";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "intUpdatedBy";
+                COLUMN.DataType = typeof(long);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "dtmUpdatedOn";
+                COLUMN.DataType = typeof(long);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "dtmTimeSTamp";
+                COLUMN.DataType = typeof(long);
+                dt.Columns.Add(COLUMN);
+
+                DataRow DR = dt.NewRow();
+                DR[0] = infoMasterMasterObj.BrokerId.BrokerID;
+                DR[1] = infoMasterMasterObj.SiteId.SiteId;
+                DR[2] = infoMasterMasterObj.ComponentId.ComponentId;
+                DR[3] = infoMasterMasterObj.InstanceId.InstanceID;
+                DR[4] = infoMasterMasterObj.ParamId.ParamID;
+                DR[5] = infoMasterMasterObj.ParamAttribute.ParamAttribute;
+                DR[6] = infoMasterMasterObj.BrokerSiteInstanceId.BrokerSiteInstanceID;
+                DR[7] = cTCL_CommonMasterAttributes.LastUpdatedBy.id;
+                DR[8] = cTCL_CommonMasterAttributes.LastUpdatedTime.TimeStamp;
+                //DR[9] = infoMasterMasterObj.dtmTimeStamp;
+                dt.Rows.Add(DR);
+
+                if (PersistSqlConn == null || PersistSqlConn.State != ConnectionState.Open)
+                {
+                    PersistSqlConn = new SqlConnection(Config.connectionString);
+                    PersistSqlConn.Open();
+                }
+
+                using (tran = PersistSqlConn.BeginTransaction(IsolationLevel.ReadCommitted))
+                {
+                    using (SqlConnection con = new SqlConnection(Config.connectionString))
+                    {
+                        using (SqlCommand cmd = new SqlCommand("[dbo].[usp_InfoMaster_insupd]"))
+                        {
+                            cmd.CommandType = CommandType.StoredProcedure;
+                            cmd.Connection = con;
+                            cmd.Parameters.AddWithValue("@InfoMaster", dt);
+                            con.Open();
+                            cmd.ExecuteNonQuery();
+                            con.Close();
+                        }
+                    }
+                    tran.Commit();
+                }
+                Log.Info(" Info Master data saved to Database ");
+                return response.Set(StatusCode.Success, "Info Master Data uploaded Sucessfully");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, " Info Master data couldn't save  to Database ");
+                return response.Set(StatusCode.Failure, "Error Occured at Info Master Data Insert :" + ex.Message);
+            }
+        }
+
+    }
+}
+
+
+using CTCL.BinaryProtocol.Common.CMA.DBWrite.EntityModels;
+using CTCL.BinaryProtocol.Common.CTCL.DBWrite.EntityModels;
+using System.Data;
+using System.Data.SqlClient;
+using Response = BinaryProtocol.Common.Response;
+using StatusCode = BinaryProtocol.Common.StatusCode;
+using Log = LoginSignupCore.Global.Log;
+using LoginSignupCore.Global;
+
+namespace LoginSignupCore.Processor
+{
+    public class CMA_InfoStatisticsMessageProcessor
+    {
+        CTCL_CommonMasterAttributes cTCL_CommonMasterAttributes = new CTCL_CommonMasterAttributes();
+
+        private SqlConnection? PersistSqlConn;
+        private SqlTransaction? tran;
+        public Response processInfoStatisticsData(InfoStatistics infoMasterStatisticsObj)
+        {
+            Response response = new Response();
+            try
+            {
+                DataTable dt = new DataTable();
+                // Adding Columns
+                //
+                DataColumn COLUMN = new DataColumn();
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "intBrokerId";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "intSiteId";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "intComponentId";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "intInstanceId";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "intParamId";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "nvcReference";
+                COLUMN.DataType = typeof(char);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "nvcValue";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "intUpdatedBy";
+                COLUMN.DataType = typeof(long);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "dtmUpdatedOn";
+                COLUMN.DataType = typeof(long);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "dtmTimeSTamp";
+                COLUMN.DataType = typeof(long);
+                dt.Columns.Add(COLUMN);
+
+                DataRow DR = dt.NewRow();
+                DR[0] = infoMasterStatisticsObj.BrokerId.BrokerID;
+                DR[1] = infoMasterStatisticsObj.SiteId.SiteId;
+                DR[2] = infoMasterStatisticsObj.ComponentId.ComponentId;
+                DR[3] = infoMasterStatisticsObj.InstanceId.InstanceID;
+                DR[4] = infoMasterStatisticsObj.ParamId.ParamID;
+                DR[5] = infoMasterStatisticsObj.Reference.References;
+                DR[6] = infoMasterStatisticsObj.nvcValue.Value;
+                DR[7] = cTCL_CommonMasterAttributes.LastUpdatedBy.id;
+                DR[8] = cTCL_CommonMasterAttributes.LastUpdatedTime.TimeStamp;
+                DR[9] = infoMasterStatisticsObj.dtmTimeStamp;
+                dt.Rows.Add(DR);
+
+                if (PersistSqlConn == null || PersistSqlConn.State != ConnectionState.Open)
+                {
+                    PersistSqlConn = new SqlConnection(Config.connectionString);
+                    PersistSqlConn.Open();
+                }
+
+                using (tran = PersistSqlConn.BeginTransaction(IsolationLevel.ReadCommitted))
+                {
+                    using (SqlConnection con = new SqlConnection(Config.connectionString))
+                    {
+                        using (SqlCommand cmd = new SqlCommand("[dbo].[usp_InfoStatistics_insupd]"))
+                        {
+                            cmd.CommandType = CommandType.StoredProcedure;
+                            cmd.Connection = con;
+                            cmd.Parameters.AddWithValue("@InfoStatistics", dt);
+                            con.Open();
+                            cmd.ExecuteNonQuery();
+                            con.Close();
+                        }
+                    }
+                    tran.Commit();
+                }
+                Log.Info("Info Statistics data saved to Database ");
+                return response.Set(StatusCode.Success, "Info Statistics Data uploaded Sucessfully");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Info Statistics data couldn't save  to Database ");
+                return response.Set(StatusCode.Failure, "Error Occured at Info Statistics Data Insert :" + ex.Message);
+            }
+        }
+
+    }
+}
+
+
+using BinaryProtocol.Common;
+using LoginSignupCore.Global;
+using LoginSignupCore.Models.Response;
+using System.Data;
+using System.Data.SqlClient;
+
+namespace LoginSignupCore.Processor
+{
+    public class ComponentStatusProcessor
+    {
+        private SqlConnection PersistSqlConn;
+        private SqlTransaction tran;
+
+        public Response ProcessComponentStatusData(ComponentStatus componentStatus)
+        {
+            Response response = new Response();
+            try
+            {
+                DataTable dt = new DataTable();
+                // Adding Columns
+                //
+                DataColumn COLUMN = new DataColumn();
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "intBrokerId";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "intSiteId";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "intAgentId";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "nvcRequestId";
+                COLUMN.DataType = typeof(string);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "intComponentId";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "intInstanceId";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "intComponentState";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "dtmUploadedOn";
+                COLUMN.DataType = typeof(DateTime);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "bitIsSucessStatus";
+                COLUMN.DataType = typeof(bool);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "nvcRemarks";
+                COLUMN.DataType = typeof(string);
+
+                dt.Columns.Add(COLUMN);
+
+                DataRow DR = dt.NewRow();
+                DR[0] = componentStatus.BrokerId;
+                DR[1] = componentStatus.SiteId;
+                DR[2] = componentStatus.AgentId;
+                DR[3] = componentStatus.RequestId;
+                DR[4] = componentStatus.ComponentType;
+                DR[5] = componentStatus.InstanceId;
+                DR[6] = componentStatus.ComponentState;
+                DR[7] = componentStatus.TimeStamp;
+                DR[8] = componentStatus.IsSucessStatus;
+                DR[9] = componentStatus.Message;
+                dt.Rows.Add(DR);
+
+                if (PersistSqlConn == null || PersistSqlConn.State != ConnectionState.Open)
+                {
+                    PersistSqlConn = new SqlConnection(Config.connectionString);
+                    PersistSqlConn.Open();
+                }
+
+                using (tran = PersistSqlConn.BeginTransaction(System.Data.IsolationLevel.ReadCommitted))
+                {
+                    using (SqlConnection con = new SqlConnection(Config.connectionString))
+                    {
+                        using SqlCommand cmd = new SqlCommand("[dbo].[usp_ComponentStatus_ins]");
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Connection = con;
+                        cmd.Parameters.AddWithValue("@ComponentStatus", dt);
+                        con.Open();
+                        cmd.ExecuteNonQuery();
+                        con.Close();
+                    }
+                    tran.Commit();
+                }
+                Log.Info("ComponentStatus data saved to Database ");
+                return response.Set((BinaryProtocol.Common.StatusCode)StatusCode.Success, "ComponentStatus Data uploaded Sucessfully");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "ComponentStatus data couldn't save  to Database ");
+                return response.Set(StatusCode.Failure, "Error Occured at ComponentStatus Data Insert :" + ex.Message);
+            }
+        }
+    }
+}
+
+
+
+using BinaryProtocol.Common;
+using LoginSignupCore.Global;
+using LoginSignupCore.MasterCache;
+using System.Data;
+using System.Data.SqlClient;
+
+namespace LoginSignupCore.Processor
+{
+    public class CompTechnicalInfoProcessor
+    {
+        private SqlConnection PersistSqlConn;
+        private SqlTransaction tran;
+
+        public Response ProcessComponentTechnicalInfoData(ComponentsTechnicalInfo compTechncialInfo)
+        {
+            Response response = new Response();
+            try
+            {
+                DataTable dt = new DataTable();
+                // Adding Columns
+                //
+                DataColumn COLUMN = new DataColumn();
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "intBrokerId";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "intSiteId";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "intAgentId";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "intComponentId";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "intInstanceId";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "numRamUtilization";
+                COLUMN.DataType = typeof(double);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "numCpuUtilization";
+                COLUMN.DataType = typeof(double);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "numCpuHigh";
+                COLUMN.DataType = typeof(double);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "numCpuLow";
+                COLUMN.DataType = typeof(double);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "numRamHigh";
+                COLUMN.DataType = typeof(double);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "numRamLow";
+                COLUMN.DataType = typeof(double);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "dtmUpdatedOn";
+                COLUMN.DataType = typeof(string);
+
+                dt.Columns.Add(COLUMN);
+
+                DataRow DR = dt.NewRow();
+                DR[0] = compTechncialInfo.BrokerId;
+                DR[1] = compTechncialInfo.SiteId;
+                DR[2] = compTechncialInfo.AgentId;
+                DR[3] = compTechncialInfo.ComponentId;
+                DR[4] = compTechncialInfo.InstanceId;
+                DR[5] = compTechncialInfo.RAMUtilization;
+                DR[6] = compTechncialInfo.CPUUtilization;
+                DR[7] = compTechncialInfo.CPUHigh;
+                DR[8] = compTechncialInfo.CPULow;
+                DR[9] = compTechncialInfo.RAMHigh;
+                DR[10] = compTechncialInfo.RAMLow;
+                DR[11] = compTechncialInfo.Timestamp;
+                dt.Rows.Add(DR);
+
+                if (PersistSqlConn == null || PersistSqlConn.State != ConnectionState.Open)
+                {
+                    PersistSqlConn = new SqlConnection(Config.connectionString);
+                    PersistSqlConn.Open();
+                }
+
+                using (tran = PersistSqlConn.BeginTransaction(System.Data.IsolationLevel.ReadCommitted))
+                {
+                    using (SqlConnection con = new SqlConnection(Config.connectionString))
+                    {
+                        using (SqlCommand cmd = new SqlCommand("[dbo].[usp_CompTechnicalInfo_ins]"))
+                        {
+                            cmd.CommandType = CommandType.StoredProcedure;
+                            cmd.Connection = con;
+                            cmd.Parameters.AddWithValue("@CompTechnicalInfo", dt);
+                            con.Open();
+                            cmd.ExecuteNonQuery();
+                            con.Close();
+
+                        }
+                    }
+                    tran.Commit();
+                }
+                Log.Info("CompTechnicalInfo data saved to Database ");
+                return response.Set((BinaryProtocol.Common.StatusCode)StatusCode.Success, "CompTechnicalInfo Data uploaded Sucessfully");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "CompTechnicalInfo data couldn't save  to Database ");
+                return response.Set(StatusCode.Failure, "Error Occured at CompTechnicalInfo Data Insert :" + ex.Message);
+            }
+        }
+    }
+}
+
+
+
+using CTCL.BinaryProtocol.Common.CTCL;
+using System.Runtime.InteropServices;
+using Response = BinaryProtocol.Common.Response;
+using StatusCode = BinaryProtocol.Common.StatusCode;
+using CTCL_OpCode = CTCL.BinaryProtocol.Common.CTCL.Enum.CTCL_OpCode;
+using CMA_OpCode = CTCL.BinaryProtocol.Common.CMA.Enum.CMA_OpCode;
+using CTCL.BinaryProtocol.Common.CMA.DBWrite.EntityModels;
+using LoginSignupCore.Global;
+using Utility;
+
+namespace LoginSignupCore.Processor
+{
+    public class DataProcessor
+    {
+        Conversion conversion;
+        CMA_InfoMasterMessageProcessor infoMasterMessageProcessor;
+        CMA_InfoStatisticsMessageProcessor infoStatisticsMessageProcessor;
+
+        public DataProcessor()
+        {
+            conversion = new Conversion();
+            infoMasterMessageProcessor = new CMA_InfoMasterMessageProcessor();
+            infoStatisticsMessageProcessor = new CMA_InfoStatisticsMessageProcessor();
+        }
+
+        public Response SourceComp_DataProcess(byte[] ValidPacket)
+        {
+            Response response = new Response();
+            try
+            {
+                if (ValidPacket != null && ValidPacket.Length != 0)
+                {
+                    CTCL_MessageHeader msgOrderInfoObj1 = conversion.FromBytesToObject<CTCL_MessageHeader>(ValidPacket);
+                    //var opcode = BitConverter.ToInt32(ValidPacket, 0);
+                    Console.WriteLine($"{msgOrderInfoObj1.OpCode}");
+                    switch (msgOrderInfoObj1.OpCode)
+                    {
+                        case (CTCL_OpCode)CMA_OpCode.INFO_MASTER_FOR_DB:
+                            if (IsDataValid<InfoMaster>(ValidPacket))
+                            {
+                                InfoMaster entity = conversion.FromBytesToObject<InfoMaster>(ValidPacket);
+                                response = infoMasterMessageProcessor.processInfoMasterData(entity);
+                            }
+                            else
+                            {
+                                response = response.Set(StatusCode.Failure, "Request Type & bytes of data doesn't match (Invalid data) OpCode ->" + msgOrderInfoObj1.OpCode.ToString(), null);
+                            }
+                            break;
+
+                        case (CTCL_OpCode)CMA_OpCode.INFO_STATISTICS_FOR_DB:
+                            if (IsDataValid<InfoStatistics>(ValidPacket))
+                            {
+                                InfoStatistics entity = conversion.FromBytesToObject<InfoStatistics>(ValidPacket);
+                                response = infoStatisticsMessageProcessor.processInfoStatisticsData(entity);
+                            }
+                            else
+                            {
+                                response = response.Set(StatusCode.Failure, "Request Type & bytes of data doesn't match (Invalid data) OpCode ->" + msgOrderInfoObj1.OpCode.ToString(), null);
+                            }
+                            break;
+
+                        default:
+                            response = response.Set(StatusCode.Failure, "Request type is not valid transcode ->" + msgOrderInfoObj1.OpCode + DateTime.UtcNow, msgOrderInfoObj1.OpCode.ToString());
+                            break;
+                    }
+                }
+                else
+                {
+                    response = response.Set(StatusCode.Failure, "Invalid bytes of Data or Data is Null or byte Array is empty. DateTime->" + DateTime.UtcNow);
+                }
+                return response;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "exception in coreprocess dataprocess");
+            }
+            return response;
+        }
+
+        private bool IsDataValid<T>(byte[] data)
+        {
+            int size = Marshal.SizeOf<T>();
+            int sizeOfArray = data.Length;
+            Log.Debug(null, "Bytelength: " + sizeOfArray);
+            Log.Debug(null, "Structlength: " + size);
+            return sizeOfArray == size;
+        }
+
+
+    }
+}
+
+
+using Utility.Queueing;
+using BinaryProtocol.Common;
+using LoginSignupCore.Models.Others;
+using Newtonsoft.Json;
+using CTCL.BinaryProtocol.Common.CMA.Enum;
+using LoginSignupCore.Models.Response;
+using LoginSignupCore.Global;
+using LoginSignupCore.MasterCache;
+using LoginSignupCore.Core;
+using Org.BouncyCastle.Ocsp;
+using LoginSignupCore.Models.Request;
+
+namespace LoginSignupCore.Processor
+{
+	public class DBProcessor
+	{
+		private ProcessQueue<string> processQueue;
+		Thread thread;
+		FileStatusProcessor fileStatusProcessor;
+        ComponentStatusProcessor componentStatusProcessor;
+        CompTechnicalInfoProcessor compTechnicalInfoProcessor;
+		ManualResetEvent _mre;
+        Thread techInfoThread;
+
+        public DBProcessor()
+		{
+			fileStatusProcessor = new();
+			componentStatusProcessor = new();
+			compTechnicalInfoProcessor = new();
+			_mre= new ManualResetEvent(false);
+            processQueue = new();
+            DrainerThreadInit();
+   //         techInfoThread = new(new ThreadStart(ProcessCompTechMre));
+			//techInfoThread.Start();
+        }
+
+		private void DrainerThreadInit()
+		{
+			thread = new Thread(new ThreadStart(DrainerMethod));
+			thread.Start();
+		}
+		public Response Enqueue(string message)
+		{
+			return processQueue.Enqueue(message);	
+		}
+		private void DrainerMethod()
+		{
+			while (true)
+			{
+				if (processQueue.TryDequeue(out string message))
+				{
+					try
+					{
+						ProcessMessage(message);
+					}
+					catch (Exception ex)
+					{
+						Log.Error($"Error while DrainerMethod in DbProcessor | {ex.Message}");
+					}
+				}
+			}
+		}
+		private void ProcessMessage(string message)
+		{
+            var baseResponse = JsonConvert.DeserializeObject<MsgHeader>(message);
+            if (baseResponse != null)
+			{
+                var opcode = (CMA_OpCode)baseResponse.MessageCode;
+                switch (opcode)
+				{
+                    case CMA_OpCode.COMPONENT_STATE_UPDATE:
+                        {
+                            var compStatus = JsonConvert.DeserializeObject<ComponentStatus>(message);
+                            if (compStatus != null)
+                            {
+								componentStatusProcessor.ProcessComponentStatusData(compStatus);
+                            }
+                            else
+                            {
+                                Log.Error($"Error while writing COMPONENT_STATE_UPDATE in db");
+                            }
+                        }
+                        break;
+
+                    case CMA_OpCode.FILE_UPLOAD_CONFIRMATION:
+                        {
+                            var fileStatus = JsonConvert.DeserializeObject<FileStatus>(message);
+                            if (fileStatus != null)
+                            {
+								fileStatusProcessor.ProcessFileStatusData(fileStatus);
+                            }
+                            else
+                            {
+                                Log.Error($"Error while writing FILE_UPLOAD_CONFIRMATION in db");
+                            }
+                        }
+                        break;
+
+                    case CMA_OpCode.CMA_TECHNICAL_PARAM_REQ:
+                        {
+                            var techInfo = JsonConvert.DeserializeObject<ComponentTechincalInfo>(message);
+                            if (techInfo != null)
+                            {
+                                var resp = IsWriteInDb(techInfo);
+                                if (resp.Item1)
+                                {
+                                    var info = CoreProcess.agentSessionCache.GetTechnicalInfo(resp.Item2);
+                                    if(info.Item1 && info.Item2 != null)
+                                    {
+                                        //info.Item2.Timestamp = DateTime.Now.Date;
+                                        compTechnicalInfoProcessor.ProcessComponentTechnicalInfoData(info.Item2);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                Log.Error($"Error while writing CMA_TECHNICAL_PARAM_REQ in db");
+                            }
+                        }
+                        break;
+
+                    default:
+                        break;
+                }
+
+            }
+
+        }
+
+        private (bool, CompInitReq) IsWriteInDb(ComponentTechincalInfo componentsTechnicalInfo)
+        {
+            CompInitReq compInitReq = new()
+            {
+                AgentId = componentsTechnicalInfo.AgentId,
+                BrokerId = componentsTechnicalInfo.BrokerId,
+                SiteId = componentsTechnicalInfo.SiteId,
+                CompId = componentsTechnicalInfo.ComponentType,
+                InstanceId = componentsTechnicalInfo.InstanceId
+            };
+
+            var res = CoreProcess.agentSessionCache.GetComponentMaster(compInitReq);
+            if(res.Item1 && res.Item2 != null)
+            {
+                double cpuThreshold = res.Item2.CpuThresholdLimit;
+                double ramThreshold = res.Item2.RamThresholdLimit;
+
+                if (cpuThreshold <= componentsTechnicalInfo.CPUPercentage || ramThreshold <= componentsTechnicalInfo.RAMUsage)
+                    return (true, compInitReq);
+            }
+            return (false, compInitReq);
+        }
+        //private void ProcessCompTechMre()
+        //{
+        //	while(true)
+        //	{
+        //		_mre.WaitOne(60000);
+        //		List<ComponentsTechnicalInfo> list = CoreProcess.agentSessionCache.GetTechnicalInfo();
+        //		foreach(var item in list)
+        //      {
+        //			ProcessComponentTechnicalInfo(item);
+        //      }
+        //	}
+        //}
+        //      private void ProcessComponentTechnicalInfo(ComponentsTechnicalInfo componentsTechnicalInfo)
+        //{
+        //          compTechnicalInfoProcessor.ProcessComponentTechnicalInfoData(componentsTechnicalInfo);
+        //      }
+    }
+}
+
+
+
+
+using BinaryProtocol.Common;
+using LoginSignupCore.Global;
+using LoginSignupCore.Models.Response;
+using System.Data;
+using System.Data.SqlClient;
+
+namespace LoginSignupCore.Processor
+{
+    public class FileStatusProcessor
+    {
+        private SqlConnection PersistSqlConn;
+        private SqlTransaction tran;
+
+        public Response ProcessFileStatusData(FileStatus fileStatus)
+        {
+            Response response = new Response();
+            try
+            {
+                DataTable dt = new DataTable();
+                // Adding Columns
+                //
+                DataColumn COLUMN = new DataColumn();
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "intBrokerId";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "intSiteId";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "intAgentId";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "intFileType";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "intSegment";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "nvcFileName";
+                COLUMN.DataType = typeof(string);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "dtmUploadedOn";
+                COLUMN.DataType = typeof(DateTime);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "bitIsSucessStatus";
+                COLUMN.DataType = typeof(bool);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "nvcRemarks";
+                COLUMN.DataType = typeof(string);
+
+                dt.Columns.Add(COLUMN);
+
+                DataRow DR = dt.NewRow();
+                DR[0] = fileStatus.BrokerId;
+                DR[1] = fileStatus.SiteId;
+                DR[2] = fileStatus.AgentId;
+                DR[3] = fileStatus.FileType;
+                DR[4] = fileStatus.Segment;
+                DR[5] = fileStatus.FileName;
+                DR[6] = fileStatus.TimeStamp;
+                DR[7] = fileStatus.IsSucessStatus;
+                DR[8] = fileStatus.Message;
+                dt.Rows.Add(DR);
+
+                if (PersistSqlConn == null || PersistSqlConn.State != ConnectionState.Open)
+                {
+                    PersistSqlConn = new SqlConnection(Config.connectionString);
+                    PersistSqlConn.Open();
+                }
+
+                using (tran = PersistSqlConn.BeginTransaction(System.Data.IsolationLevel.ReadCommitted))
+                {
+                    using (SqlConnection con = new SqlConnection(Config.connectionString))
+                    {
+                        using SqlCommand cmd = new SqlCommand("[dbo].[usp_FileStatus_ins]");
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Connection = con;
+                        cmd.Parameters.AddWithValue("@FileStatus", dt);
+                        con.Open();
+                        cmd.ExecuteNonQuery();
+                        con.Close();
+                    }
+                    tran.Commit();
+                }
+                Log.Info("FileStatus data saved to Database ");
+                return response.Set((BinaryProtocol.Common.StatusCode)StatusCode.Success, "FileStatus Data uploaded Sucessfully");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "FileStatus data couldn't save  to Database ");
+                return response.Set(StatusCode.Failure, "Error Occured at FileStatus Data Insert :" + ex.Message);
+            }
+        }
+    }
+}
+
+
+
+using BinaryProtocol.Common;
+using Exchange.Logs;
+using LoginSignupCore.Core;
+using Serilog.Events;
+using System.Text;
+using Utility.Queueing;
+
+namespace LoginSignupCore.Processor
+
+{
+    public class LogProcessor
+    {
+        private ProcessQueue<LogObject> logQueue;
+        private Thread thread;
+        private LogManager logManager;
+        private StringBuilder logMsg;
+        public LogProcessor(LogConfiguration logConfiguration)
+        {
+            logMsg = new StringBuilder();
+            logManager = new LogManager(logConfiguration);
+            logQueue = new ProcessQueue<LogObject>();
+            thread = new Thread(new ThreadStart(ListenQueue));
+            thread.Start();
+        }
+        public Response Enqueue(LogObject data)
+        {
+            return logQueue.Enqueue(data);
+        }
+        private void ListenQueue()
+        {
+            while (true)
+            {
+                if (logQueue.TryDequeue(out LogObject data))
+                {
+                    LogDataProcess(data);
+                }
+                data.Object = null;
+                data.Message = null;
+            }
+
+        }
+
+        private void LogDataProcess(LogObject data)
+        {
+            LogObject logObject = data;
+
+            logMsg.Clear();
+            logMsg.Append("Msg: " + data.Message);
+
+            if (logObject.Object != null)
+            {
+                logMsg.Append(", Object: " + Helper.SerializeObject(logObject.Object));
+            }
+
+            try
+            {
+                switch (logObject.LogType)
+                {
+                    case LogType.Verbose:
+                        logManager.Verbose(logMsg.ToString());
+                        break;
+                    case LogType.Debug:
+                        logManager.Debug(logMsg.ToString());
+                        break;
+                    case LogType.Error:
+                        logManager.Error(logMsg.ToString());
+                        break;
+                    case LogType.Info:
+                        logManager.Info(logMsg.ToString());
+                        break;
+                    case LogType.Warning:
+                        logManager.Warning(logMsg.ToString());
+                        break;
+                    case LogType.Fatal:
+                        logManager.Error(logMsg.ToString());
+                        break;
+                    default:
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                logManager.Error(ex, "Msg: Error in log, Object: ");
+            }
+            finally
+            {
+                logObject.Message = null;
+                logObject.Object = null;
+                logMsg.Clear();
+            }
+        }
+
+        public void ChangeLogType(LogEventLevel loglevel)
+        {
+            logManager.ChangeLogLevel(loglevel);
+        }
+    }
+}
+
+
+
+using LoginSignupCore.Models;
+
+namespace LoginSignupCore.ViewModels
+{
+    public class CommonViewModel
+    {
+        //public ComponentParameter ComponentParameter { get; set; }
+        //public AlertThreshold AlertThreshold { get; set; }
+        public VwComponentInstanceBrokerWiseData VwComponentInstanceBrokerWiseData { get; set; }
+        //public globals globals { get; set; }
+    }
+}
+
+
+
+namespace LoginSignupCore
+{
+
+        using Microsoft.Extensions.Configuration;
+        using System;
+
+        public static class AppSettingHelper
+        {
+            static AppSettingHelper()
+            {
+                Configuration = new ConfigurationBuilder()
+                 .SetBasePath(ProcessDirectory)
+                 .AddJsonFile("appsettings.json")
+                 .Build();
+            }
+
+            public static string ProcessDirectory
+            {
+                get
+                {
+                    return AppDomain.CurrentDomain.BaseDirectory;
+                }
+            }
+
+            public static IConfigurationRoot Configuration { get; }
+        }
+    }
+
+
+
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  },
+  "AllowedHosts": "*",
+  "ConnectionStrings": {
+    //"DBCTCL": "Data Source=10-100-1-57;Initial Catalog=CTCL;Integrated Security=SSPI;Persist Security Info=True;TrustServerCertificate=True;MultipleActiveResultSets=True"
+    "DBCTCL": "Data Source=10.100.1.57; Initial Catalog=CTCL; User Id=sa; Password=Sa@123; TrustServerCertificate=True"
+  },
+  "LogFile": "C:\\Logs\\AgentWorkerLogs\\AgentWorker.log",
+  "AgentIpAddress": "localhost",
+  "Port": 8888,
+  "PrefetchCount": 0,
+  "LogLevel": "0",
+  "LogFileCount": "1",
+  "ServerIP": "10.100.1.101",
+  "ServerPort": "5556",
+  "DBTimeOut": "180"
+}
+
+
+
+
+using LoginSignupCore.Data;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.EntityFrameworkCore;
+using LoginSignupCore;
+using LoginSignupCore.Global;
+using LoginSignupCore.Core;
+
+var builder = WebApplication.CreateBuilder(args);
+new exitHook();
+// Add services to the container.
+builder.Services.AddHostedService<Worker>(services => new Worker());
+builder.Services.AddSingleton<IHostLifetime, NoopConsoleLifetime>();
+builder.Services.AddControllersWithViews();
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
+{
+	options.IdleTimeout = TimeSpan.FromMinutes(20);
+});
+
+builder.Services.AddSession(options=>
+{
+	options.IOTimeout= TimeSpan.FromMinutes(30);
+	options.Cookie.HttpOnly= true;
+	options.Cookie.IsEssential= true;
+});
+builder.Services.AddAuthentication(
+	CookieAuthenticationDefaults.AuthenticationScheme)
+	.AddCookie(option => {
+		option.LoginPath = "/Account/Login"; 
+		option.ExpireTimeSpan = TimeSpan.FromMinutes(20);
+	});
+
+builder.Services.AddDbContext<ApplicatonDBContext>(
+	options => { options.UseSqlServer(Config.connectionString); }
+	);
+var app = builder.Build();
+
+app.UseSession();
+
+
+// Configure the HTTP request pipeline.
+//if (!app.Environment.IsDevelopment())
+//{
+	//app.UseExceptionHandler("/Home/Error");
+	//// The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+	//app.UseHsts();
+//}
+
+//app.UseHttpsRedirection();
+app.UseStaticFiles();
+app.UseRouting();
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapControllerRoute(
+	name: "default",
+	pattern: "{controller=Account}/{action=Login}/{id?}");
+
+Config.GetConfigurationSettings();
+app.Urls.Add(Config.AppUrl);
+app.Run();
 
 
 
 
 
+using CTCL.Utility;
+using LoginSignupCore.Core;
 
+namespace LoginSignupCore
+{
+    public class Worker : BackgroundService
+    {
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            await CoreProcess.Initialize();
+            new ConsoleHelper();
+        }
 
+        /// <summary>
+        /// Executes when the service is ready to start.
+        /// </summary>
+        /// <param name="cancellationToken"><see cref="CancellationToken"/></param>
+        /// <returns><see cref="Task"/></returns>
+        public override Task StartAsync(CancellationToken cancellationToken)
+        {
+            return base.StartAsync(cancellationToken);
+        }
+    }
+    public class NoopConsoleLifetime : IHostLifetime, IDisposable
+    {
+        private readonly ILogger<NoopConsoleLifetime> _logger;
+
+        public NoopConsoleLifetime(ILogger<NoopConsoleLifetime> logger)
+        {
+            _logger = logger;
+        }
+
+        public Task StopAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task WaitForStartAsync(CancellationToken cancellationToken)
+        {
+            Console.CancelKeyPress += OnCancelKeyPressed;
+            return Task.CompletedTask;
+        }
+
+        private void OnCancelKeyPressed(object? sender, ConsoleCancelEventArgs e)
+        {
+            _logger.LogInformation("Ctrl+C has been pressed, ignoring.");
+            e.Cancel = true;
+        }
+
+        public void Dispose()
+        {
+            Console.CancelKeyPress -= OnCancelKeyPressed;
+        }
+    }
+    public class ConsoleHelper : exitHook
+    {
+        public ConsoleHelper()
+        {
+            new Thread(Process).Start();
+        }
+
+        private void Process()
+        {
+            while (true)
+            {
+                Console.WriteLine("Enter Your Choice");
+                var choice = GetChoice();
+                switch (choice)
+                {
+                    case -1:
+                        exitHookInit();
+                        break;
+                    default:
+                        Console.WriteLine("Wrong Choice");
+                        break;
+                }
+            }
+        }
+
+        private int GetChoice()
+        {
+            try
+            {
+                var res = Convert.ToInt32(Console.ReadLine());
+                return res;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Plz enter a number only");
+                return GetChoice();
+            }
+        }
+        private void exitHookInit()
+        {
+            string strExitconfirm;
+            Console.WriteLine("Are you sure you want to exit y/n ");
+            strExitconfirm = Console.ReadLine();
+            if (strExitconfirm?.ToLower() == "y")
+            {
+                Environment.Exit(0);
+            }
+            else
+            {
+                // ask();
+            }
+        }
+    }
+}
 
 
