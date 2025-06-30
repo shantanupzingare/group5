@@ -349,7 +349,374 @@ namespace UserInterface.Services
 
 
 
-﻿using BinaryProtocol.Common;
+using BinaryProtocol.Common;
+using ConsumerDBComponent.Common;
+using CTCL.BinaryProtocol.Common.CTCL.Common;
+using CTCL.BinaryProtocol.Common.CTCL.DBWrite;
+using CTCL.BinaryProtocol.Common.CTCL.Request.EnterpriseMaster.ClientParticipant;
+using CTCL.CacheManagement.Models;
+using System.Data;
+using System.Data.SqlClient;
+using System.Runtime.InteropServices;
+using Utility;
+
+namespace ConsumerDBComponent.MessageProcessor
+{
+	public class ClientParticipantMappingProcessor
+	{
+		private Conversion conversion;
+		private SqlConnection? PersistSqlConn;
+		private SqlTransaction? tran; 
+		public ClientParticipantMappingProcessor()
+		{
+			conversion = new Conversion();
+		}
+
+
+		#region Client participant mapping
+
+		public Response ProcessClientParticipantMappingDBRequest(CTCL_CLIENT_PARTICIPANT_MASTER_UPDATE clientParticipantMappingRequest)
+		{
+			Response response = new();
+			try
+			{
+				var mappingData = GetClientParticipantMappingData(clientParticipantMappingRequest.NoOfRecordsofParticipant, clientParticipantMappingRequest.EMData);
+				var dataTable = CreateDataTable();
+				for (int i = 0; i < mappingData.Count; i++)
+				{
+					DataRow DR = dataTable.NewRow();
+					DR[0] = clientParticipantMappingRequest.ExchangeSegmentId.SegmentId;
+					DR[1] = clientParticipantMappingRequest.ClientId.TerminalId;
+					DR[2] = mappingData[i].ParticipantId.ParticipantId;
+					DR[3] = clientParticipantMappingRequest.CommonMasterAttributes.LastUpdatedBy.id;
+					DR[4] = clientParticipantMappingRequest.CommonMasterAttributes.LastUpdatedTime.TimeStamp;
+
+					if (mappingData[i].OperationMode == CTCL.BinaryProtocol.Common.CTCL.Enum.CTCL_OperationMode.ADD)
+					{
+						DR[5] = "ClientParticipantMappingAdd".ToCharArray();
+						DR[6] = 1;
+					}
+					else
+					{
+						DR[5] = "ClientParticipantMappingRemove".ToCharArray();
+						DR[6] = 0;
+					}
+					DR[7] = 0;
+					dataTable.Rows.Add(DR);
+				}
+				if (PersistSqlConn == null || PersistSqlConn.State != ConnectionState.Open)
+				{
+					PersistSqlConn = new SqlConnection(Constant.DbConnectionString);
+					PersistSqlConn.Open();
+				}
+
+				using (tran = PersistSqlConn.BeginTransaction(IsolationLevel.ReadCommitted))
+				{
+					using (SqlConnection con = new SqlConnection(Constant.DbConnectionString))
+					{
+						using (SqlCommand cmd = new SqlCommand("[dbo].[usp_ClientParticipantMappingMaster_insupd]"))
+						{
+							cmd.CommandType = CommandType.StoredProcedure;
+							cmd.Connection = con;
+							cmd.Parameters.AddWithValue("@ClientParticipantMappingMaster", dataTable);
+							con.Open();
+							cmd.ExecuteNonQuery();
+							con.Close();
+						}
+					}
+					tran.Commit();
+				}
+				Log.Info("Client participant mapping data saved to Database ");
+				response.Set(StatusCode.Success, "Client participant mapping Data uploaded Sucessfully");
+			}
+			catch (Exception ex)
+			{
+				Log.Error(ex, "Client participant mapping data couldn't save  to Database");
+				response.Set(StatusCode.Failure, "Error Occured at Client participant mapping Data Insert :" + ex.Message);
+			}
+			return response;
+		}
+
+		private DataTable CreateDataTable()
+		{
+			DataTable dt = new DataTable();
+			// Adding Columns    
+			DataColumn COLUMN = new DataColumn();
+			COLUMN.ColumnName = "ExchangeSegmentId";
+			COLUMN.DataType = typeof(int);
+			dt.Columns.Add(COLUMN);
+
+			COLUMN = new DataColumn();
+			COLUMN.ColumnName = "ClientId";
+			COLUMN.DataType = typeof(char[]);
+			dt.Columns.Add(COLUMN);
+
+			COLUMN = new DataColumn();
+			COLUMN.ColumnName = "ParticipantId";
+			COLUMN.DataType = typeof(char[]);
+			dt.Columns.Add(COLUMN);
+
+			COLUMN = new DataColumn();
+			COLUMN.ColumnName = "LastUpdatedBy";
+			COLUMN.DataType = typeof(long);
+			dt.Columns.Add(COLUMN);
+
+			COLUMN = new DataColumn();
+			COLUMN.ColumnName = "LastUpdatedOn";
+			COLUMN.DataType = typeof(long);
+			dt.Columns.Add(COLUMN);
+
+			COLUMN = new DataColumn();
+			COLUMN.ColumnName = "Remarks";
+			COLUMN.DataType = typeof(char[]);
+			dt.Columns.Add(COLUMN);
+
+			COLUMN = new DataColumn();
+			COLUMN.ColumnName = "intStatus";
+			COLUMN.DataType = typeof(long);
+			dt.Columns.Add(COLUMN);
+			
+			COLUMN = new DataColumn();
+			COLUMN.ColumnName = "IsDefault";
+			COLUMN.DataType = typeof(long);
+			dt.Columns.Add(COLUMN);
+
+			return dt;
+		}
+
+		private List<CTCL_CLIENT_PARTICIPANT_MAPPING> GetClientParticipantMappingData(CTCL_NoOfRecordsofSubData totalNumberRecords, CTCL_EMData data)
+		{
+			var mappingsList = new List<CTCL_CLIENT_PARTICIPANT_MAPPING>();
+			byte[] mappingData = new byte[Marshal.SizeOf(typeof(CTCL_CLIENT_PARTICIPANT_MAPPING))];
+
+			for (int i = 0; i < totalNumberRecords.NoOfRecordsofSubData; i++)
+			{
+				Buffer.BlockCopy(data.EMData, (mappingData.Length * i), mappingData, 0, mappingData.Length);
+				var mapping = conversion.FromBytesToObject<CTCL_CLIENT_PARTICIPANT_MAPPING>(mappingData);
+				mappingsList.Add(mapping);
+			}
+
+			return mappingsList;
+		}
+		#endregion
+
+		#region  Participant Ack
+
+		public Response ProcessParticipantTradeAck(CTCL_ParticipantMakerChecker acknowledgement_Response)
+		{
+			Response response = new();
+			try
+			{
+				DataTable dt = new DataTable();
+				// Adding Columns
+
+				DataColumn COLUMN = new DataColumn();
+				COLUMN = new DataColumn();
+				COLUMN.ColumnName = "ExchangeSegmentId";
+				COLUMN.DataType = typeof(int);
+				dt.Columns.Add(COLUMN);
+				
+				COLUMN = new DataColumn();
+				COLUMN.ColumnName = "ExchangeOrderNumber";
+				COLUMN.DataType = typeof(long);
+				dt.Columns.Add(COLUMN);
+
+				COLUMN = new DataColumn();
+				COLUMN.ColumnName = "ProClientIndicator";
+				COLUMN.DataType = typeof(short);
+				dt.Columns.Add(COLUMN);
+
+				COLUMN = new DataColumn();
+				COLUMN.ColumnName = "ClientAccountCode";
+				COLUMN.DataType = typeof(char[]);
+				dt.Columns.Add(COLUMN);
+
+				COLUMN = new DataColumn();
+				COLUMN.ColumnName = "ParticipantCode";
+				COLUMN.DataType = typeof(char[]);
+				dt.Columns.Add(COLUMN);
+
+				COLUMN = new DataColumn();
+				COLUMN.ColumnName = "Buy_SellIndicator";
+				COLUMN.DataType = typeof(short);
+				dt.Columns.Add(COLUMN);
+				
+				COLUMN = new DataColumn();
+				COLUMN.ColumnName = "ProductType";
+				COLUMN.DataType = typeof(short);
+				dt.Columns.Add(COLUMN);
+
+				COLUMN = new DataColumn();
+				COLUMN.ColumnName = "Token";
+				COLUMN.DataType = typeof(long);
+				dt.Columns.Add(COLUMN);
+				
+				COLUMN = new DataColumn();
+				COLUMN.ColumnName = "TotalVolume";
+				COLUMN.DataType = typeof(long);
+				dt.Columns.Add(COLUMN);
+
+
+				COLUMN = new DataColumn();
+				COLUMN.ColumnName = "TradedQuantity";
+				COLUMN.DataType = typeof(long);
+				dt.Columns.Add(COLUMN);
+
+				COLUMN = new DataColumn();
+				COLUMN.ColumnName = "Price";
+				COLUMN.DataType = typeof(long);
+				dt.Columns.Add(COLUMN);
+
+				COLUMN = new DataColumn();
+				COLUMN.ColumnName = "ApprovedQuantity";
+				COLUMN.DataType = typeof(long);
+				dt.Columns.Add(COLUMN);
+				
+				COLUMN = new DataColumn();
+				COLUMN.ColumnName = "UserRemarks";
+				COLUMN.DataType = typeof(char[]);
+				dt.Columns.Add(COLUMN);
+				
+				COLUMN = new DataColumn();
+				COLUMN.ColumnName = "TimeStamp";
+				COLUMN.DataType = typeof(long);
+				dt.Columns.Add(COLUMN);
+				
+				COLUMN = new DataColumn();
+				COLUMN.ColumnName = "Action";
+				COLUMN.DataType = typeof(int);
+				dt.Columns.Add(COLUMN);
+
+				COLUMN = new DataColumn();
+				COLUMN.ColumnName = "intExchangeSpecificAttributeComposition";
+				COLUMN.DataType = typeof(char[]);
+				dt.Columns.Add(COLUMN);
+
+				COLUMN = new DataColumn();
+				COLUMN.ColumnName = "shtTimeStamp1";
+				COLUMN.DataType = typeof(long);
+				dt.Columns.Add(COLUMN);
+
+				COLUMN = new DataColumn();
+				COLUMN.ColumnName = "TradeNumber";
+				COLUMN.DataType = typeof(long);
+				dt.Columns.Add(COLUMN);
+
+				DataRow DR = dt.NewRow();
+				DR[0] = acknowledgement_Response.MessageHeader.ExchangeSegmentId.SegmentId;
+				DR[1] = acknowledgement_Response.ExchangeOrderNumber.OrderNumber;
+				DR[2] = acknowledgement_Response.AccountInformation.ProClientIndicator.ClientIndicator;
+				DR[3] = acknowledgement_Response.AccountInformation.ClientAccountCode.AccountNumber;
+				DR[4] = acknowledgement_Response.ParticipantCode.Participant;
+				DR[5] = (int)acknowledgement_Response.Buy_SellIndicator;
+				DR[6] = (int)acknowledgement_Response.ProductType;
+				DR[7] = acknowledgement_Response.Token.Token;
+				DR[8] = acknowledgement_Response.TotalVolume.Quantity;
+				DR[9] = acknowledgement_Response.TradedQuantity.Quantity;
+				DR[10] = acknowledgement_Response.Price.Price;
+				DR[11] = acknowledgement_Response.ApprovedQuantity.Quantity;
+				DR[12] = acknowledgement_Response.UserRemarks.remarks;
+				DR[13] = acknowledgement_Response.LastUpdateTimeStamp.TimeStamp;
+				DR[14] = (int)acknowledgement_Response.Action;
+				DR[15] = acknowledgement_Response.ExchangeSpecificAttributeComposition.ExchangeSpecificAttributeComposition;
+				DR[16] = Convert.ToInt64(acknowledgement_Response.smtTimeStamp1.TimeStamp);
+				DR[17] = acknowledgement_Response.TradeNumber.FillNumber;
+
+				dt.Rows.Add(DR);
+
+				if (PersistSqlConn == null || PersistSqlConn.State != ConnectionState.Open)
+				{
+					PersistSqlConn = new SqlConnection(Constant.DbConnectionString);
+					PersistSqlConn.Open();
+				}
+
+				using (tran = PersistSqlConn.BeginTransaction(IsolationLevel.ReadCommitted))
+				{
+					using (SqlConnection con = new SqlConnection(Constant.DbConnectionString))
+					{
+						using (SqlCommand cmd = new SqlCommand("[dbo].[usp_ParticipantTradeAcknowledgement_ins]"))
+						{
+							cmd.CommandType = CommandType.StoredProcedure;
+							cmd.Connection = con;
+							cmd.Parameters.AddWithValue("@ParticipantTradeAcknowledgement", dt);
+							con.Open();
+							cmd.ExecuteNonQuery();
+							con.Close();
+
+						}
+					}
+					tran.Commit();
+				}
+				Log.Info("Participant Trade acknowledegement data saved to Database ");
+				return response.Set(StatusCode.Success, "Participant Trade acknowledegement Data uploaded Sucessfully");
+			}
+			catch (Exception ex)
+			{
+				Log.Error(ex, "Participant Trade acknowledegement data couldn't save  to Database ");
+				return response.Set(StatusCode.Failure, "Error Occured at Participant Trade acknowledegement Data Insert :" + ex.Message);
+			}
+		}
+
+		#endregion
+
+		public Response ProcessClientDefaultSettlor(CTCL_ClientParticipantDefaultSettlor request)
+		{
+			Response response = new();
+			try
+			{
+				if (PersistSqlConn == null || PersistSqlConn.State != ConnectionState.Open)
+				{
+					PersistSqlConn = new SqlConnection(Constant.DbConnectionString);
+					PersistSqlConn.Open();
+				}
+
+				using (tran = PersistSqlConn.BeginTransaction(System.Data.IsolationLevel.ReadCommitted))
+				{
+					using (SqlConnection con = new SqlConnection(Constant.DbConnectionString))
+					{
+						using (SqlCommand cmd = new SqlCommand("[dbo].[usp_SetClientDefaultSettlorCode]"))
+						{
+							cmd.CommandType = CommandType.StoredProcedure;
+							cmd.Connection = con;
+							cmd.Parameters.AddWithValue("@ExchangeSegmentid", request.ExchangeSegmentId.SegmentId);
+							cmd.Parameters.AddWithValue("@TerminalId", request.ClientId.TerminalId.ToTruncateEndString());
+							cmd.Parameters.AddWithValue("@ParticipantId", request.ParticipantId.ParticipantId.ToTruncateEndString());
+
+							if (request.OperationMode == CTCL.BinaryProtocol.Common.CTCL.Enum.CTCL_OperationMode.ADD
+								|| request.OperationMode == CTCL.BinaryProtocol.Common.CTCL.Enum.CTCL_OperationMode.UPDATE)
+							{
+								cmd.Parameters.AddWithValue("@IsDefault", 1);
+							}
+							else
+							{
+								cmd.Parameters.AddWithValue("@IsDefault", 0);
+							}
+							con.Open();
+							cmd.ExecuteNonQuery();
+							con.Close();
+
+						}
+					}
+					tran.Commit();
+				}
+				Log.Info("Client Default settlor info update in Database for access count");
+				return response.Set(BinaryProtocol.Common.StatusCode.Success, "Client Default settlor info update in Database for access count ");
+			}
+			catch (Exception ex)
+			{
+				Log.Error(ex, "could not update Client Default settlor info in Database for access count");
+				return response.Set(BinaryProtocol.Common.StatusCode.Failure, "could not update Client Default settlor info in Database for access count :" + ex.Message);
+			}
+
+		}
+	}
+}
+
+
+
+
+
+using BinaryProtocol.Common;
 using CTCL.BinaryProtocol.Common.BroadcastSystem;
 using System;
 using System.Collections.Generic;
@@ -454,24 +821,39 @@ namespace ConsumerDBComponent.MessageProcessor
                 dt.Columns.Add(COLUMN);
 
 
-               
 
                 COLUMN = new DataColumn();
                 COLUMN.ColumnName = "Filler1";
                 COLUMN.DataType = typeof(char);
                 dt.Columns.Add(COLUMN);
 
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "CreatedTime";
+                COLUMN.DataType = typeof(long);
+                dt.Columns.Add(COLUMN);
 
-                for (int i=0;i< BcastIndex.NoOfRecords.NoOfRecords;i++)
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "UpdatedTime";
+                COLUMN.DataType = typeof(long);
+                dt.Columns.Add(COLUMN);
+
+
                 for (int i = 0; i < BcastIndex.NoOfRecords.NoOfRecords; i++)
                 {
                     DataRow DR = dt.NewRow();
                     DR[0] = BcastIndex.BroadcastMessageHeader.MessageHeader.ExchangeSegmentId.SegmentId;
+                    DR[1] = 0;
+                    DR[2] = BcastIndex.Indexes[i].IndexName.IndexName.ToTruncateString();
+                    DR[3] = BcastIndex.Indexes[i].IndexValue.IndexValue;
+                    DR[4] = BcastIndex.Indexes[i].HighIndexValue.IndexValue;
+                    DR[5] = BcastIndex.Indexes[i].LowIndexValue.IndexValue;
+                    DR[6] = BcastIndex.Indexes[i].OpeningIndex.IndexValue;
+                    DR[7] = BcastIndex.Indexes[i].CloseingIndex.IndexValue;
+                    DR[8] = BcastIndex.Indexes[i].PercentChange.Percentage;
+                    DR[9] = BcastIndex.Indexes[i].YearlyHigh.IndexValue;
                     DR[10] = BcastIndex.Indexes[i].YearlyLow.IndexValue;
                     DR[11] = BcastIndex.Indexes[i].UpMoves.NoOfMoves;
                     DR[12] = BcastIndex.Indexes[i].DownMoves.NoOfMoves;
-                    DR[13] =BcastIndex.Indexes[i].Capitalisation.MarketCapitalisation;
-                    DR[14] = BcastIndex.Indexes[i].NetChangeIndicator.NetChangeIndicator[0];                  
                     DR[13] = BcastIndex.Indexes[i].Capitalisation.MarketCapitalisation;
                     DR[14] = BcastIndex.Indexes[i].NetChangeIndicator.NetChangeIndicator[0];
                     DR[15] = BcastIndex.Indexes[i].Filler1.Filler1[0];
@@ -479,34 +861,18 @@ namespace ConsumerDBComponent.MessageProcessor
                     DR[17] = DateTime.Now.Ticks;
                     dt.Rows.Add(DR);
                 }
-               
-
-                if (PersistSqlConn == null || PersistSqlConn.State != ConnectionState.Open)
                 try
                 {
-                    PersistSqlConn = new SqlConnection(Constant.DbConnectionString);
-                    PersistSqlConn.Open();
-                }
                     if (PersistSqlConn == null || PersistSqlConn.State != ConnectionState.Open)
                     {
                         PersistSqlConn = new SqlConnection(Constant.DbConnectionString);
                         PersistSqlConn.Open();
                     }
 
-                using (tran = PersistSqlConn.BeginTransaction(System.Data.IsolationLevel.ReadCommitted))
-                {
-                    using (SqlConnection con = new SqlConnection(Constant.DbConnectionString))
                     using (tran = PersistSqlConn.BeginTransaction(System.Data.IsolationLevel.ReadCommitted))
                     {
-                        using (SqlCommand cmd = new SqlCommand("[dbo].[usp_MarketIndex_insupd]"))
                         using (SqlConnection con = new SqlConnection(Constant.DbConnectionString))
                         {
-                            cmd.CommandType = CommandType.StoredProcedure;
-                            cmd.Connection = con;
-                            cmd.Parameters.AddWithValue("@MarketIndex", dt);
-                            con.Open();
-                            cmd.ExecuteNonQuery();
-                            con.Close();
                             using (SqlCommand cmd = new SqlCommand("[dbo].[usp_MarketIndex_insupd]"))
                             {
                                 cmd.CommandType = CommandType.StoredProcedure;
@@ -517,9 +883,7 @@ namespace ConsumerDBComponent.MessageProcessor
                                 con.Close();
                             }
                         }
-                    }
 
-                    tran.Commit();
                         tran.Commit();
 
                     }
@@ -531,12 +895,10 @@ namespace ConsumerDBComponent.MessageProcessor
                     PushDataForDeadPoolQ(BcastIndex);
                     return response.Set(StatusCode.Failure, "Error Occured at BCastIndex Data Insert :" + ex.Message);
                 }
-                Log.Info("BCastIndex data saved to database.");
-                return response.Set((BinaryProtocol.Common.StatusCode)StatusCode.Success, "BCastIndex data uploaded Sucessfully");
-
             }
             catch (Exception ex)
             {
+                Log.Error(ex, "BCast data couldn't be saved to database");
                 return response.Set((BinaryProtocol.Common.StatusCode)StatusCode.Failure, "Error Occured at BCastIndex Data Insert :" + ex.Message);
             }
         }
@@ -558,60 +920,99 @@ namespace ConsumerDBComponent.MessageProcessor
 
     }
 }
+
+
+
+
+using BinaryProtocol.Common;
+using CTCL.BinaryProtocol.Common.BroadcastSystem;
+using System;
+using System.Collections.Generic;
+using System.Data.SqlClient;
+using System.Data;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using ConsumerDBComponent.Common;
+using CTCL.BinaryProtocol.Common.CTCL.Enum;
+
+namespace ConsumerDBComponent.MessageProcessor
+{
+    public class DPRUpdateProcessor
+    {
+        private SqlConnection PersistSqlConn;
+        private SqlTransaction tran;
+
+        public Response processDPRUpdateData(CTCL_DPR_UPDATE dprUpdate)
+        {
+            Response response = new Response();
+
+            try
+            {
                 DataTable dt = new DataTable();
 
                 if (dprUpdate.messageHeader.ExchangeSegmentId.SegmentId == (int)CTCL_ExchangeIdentifier.NSE_CM)
-                { 
                 {
                     DataColumn COLUMN = new DataColumn();
                     COLUMN.ColumnName = "intTokenNo";
                     COLUMN.DataType = typeof(int);
+                    dt.Columns.Add(COLUMN);
+
+                    COLUMN = new DataColumn();
+                    COLUMN.ColumnName = "varCreditRating";
+                    COLUMN.DataType = typeof(string);
+                    dt.Columns.Add(COLUMN);
+
+                    COLUMN = new DataColumn();
+                    COLUMN.ColumnName = "intLocalUpdateDateTime";
+                    COLUMN.DataType = typeof(Int64);
+                    dt.Columns.Add(COLUMN);
+
+                    DataRow DR = dt.NewRow();
+                    DR[0] = dprUpdate.Token.Token;
+                    DR[1] = dprUpdate.CreditRating.CreditRating.ToTruncateString();
+                    DR[2] = dprUpdate.LocalUpdateTime.TimeStamp;
 
                     dt.Rows.Add(DR);
                 }
+                else if (dprUpdate.messageHeader.ExchangeSegmentId.SegmentId == (int)CTCL_ExchangeIdentifier.BSE_CM)
+                {
 
-                if (PersistSqlConn == null || PersistSqlConn.State != ConnectionState.Open)
-                { 
-                     PersistSqlConn = new SqlConnection(Constant.DbConnectionStringCTCLCommonDb);
-                     PersistSqlConn.Open();
+                    DataColumn COLUMN = new DataColumn();
+                    COLUMN.ColumnName = "LongInstrumentId";
+                    COLUMN.DataType = typeof(int);
+                    dt.Columns.Add(COLUMN);
+
+                    COLUMN = new DataColumn();
+                    COLUMN.ColumnName = "FillerVarcharPriceRange";
+                    COLUMN.DataType = typeof(string);
+                    dt.Columns.Add(COLUMN);
+
+                    COLUMN = new DataColumn();
+                    COLUMN.ColumnName = "intLocalUpdateDateTime";
+                    COLUMN.DataType = typeof(Int64);
+                    dt.Columns.Add(COLUMN);
+
+                    DataRow DR = dt.NewRow();
+                    DR[0] = dprUpdate.Token.Token;
+                    DR[1] = dprUpdate.CreditRating.CreditRating.ToTruncateString();
+                    DR[2] = dprUpdate.LocalUpdateTime.TimeStamp;
+
+                    dt.Rows.Add(DR);
                 }
-                
-
-                using (tran = PersistSqlConn.BeginTransaction(System.Data.IsolationLevel.ReadCommitted))
                 try
                 {
-                    using (SqlConnection con = new SqlConnection(Constant.DbConnectionStringCTCLCommonDb))
                     if (PersistSqlConn == null || PersistSqlConn.State != ConnectionState.Open)
                     {
-                        string procedureName = "";
-                        string typeParameter = "";
-                        
-                        if (dprUpdate.messageHeader.ExchangeSegmentId.SegmentId == (int)CTCL_ExchangeIdentifier.NSE_CM)
-                        {
-                            procedureName = "[dbo].[usp_UpdDPR_upd]";
-                            typeParameter = "@NSECMSecurityMasterDPR";
                         PersistSqlConn = new SqlConnection(Constant.DbConnectionStringCTCLCommonDb);
                         PersistSqlConn.Open();
                     }
 
-                        }
-                        else if(dprUpdate.messageHeader.ExchangeSegmentId.SegmentId == (int)CTCL_ExchangeIdentifier.BSE_CM)
-                        {
-                            procedureName = "[dbo].[usp_BSE_UpdDPR_upd]";
-                            typeParameter = "@BSECMSecurityMasterDPR";
-                        }
-                        using (SqlCommand cmd = new SqlCommand(procedureName))
 
                     using (tran = PersistSqlConn.BeginTransaction(System.Data.IsolationLevel.ReadCommitted))
                     {
                         using (SqlConnection con = new SqlConnection(Constant.DbConnectionStringCTCLCommonDb))
                         {
-                            cmd.CommandType = CommandType.StoredProcedure;  
-                            cmd.Connection = con;
-                            cmd.Parameters.AddWithValue(typeParameter, dt);
-                            con.Open();
-                            cmd.ExecuteNonQuery();
-                            con.Close();
                             string procedureName = "";
                             string typeParameter = "";
 
@@ -636,18 +1037,13 @@ namespace ConsumerDBComponent.MessageProcessor
                                 con.Close();
                             }
                         }
-                    }
 
-                    tran.Commit();
                         tran.Commit();
 
                     }
                     Log.Info("DPR Update data saved to database.");
                     return response.Set((BinaryProtocol.Common.StatusCode)StatusCode.Success, "BCastIndex data uploaded Sucessfully");
                 }
-                Log.Info("DPR Update data saved to database.");
-                return response.Set((BinaryProtocol.Common.StatusCode)StatusCode.Success, "BCastIndex data uploaded Sucessfully");
-
                 catch (Exception ex)
                 {
                     PushDataForDeadPoolQ(dprUpdate);
@@ -656,6 +1052,7 @@ namespace ConsumerDBComponent.MessageProcessor
             }
             catch (Exception ex)
             {
+                Log.Error(ex, "DPR Update data couldn't be saved to database");
                 return response.Set((BinaryProtocol.Common.StatusCode)StatusCode.Failure, "Error Occured at BCastIndex Data Insert :" + ex.Message);
             }
         }
@@ -679,3 +1076,98 @@ namespace ConsumerDBComponent.MessageProcessor
     }
 }
 
+
+using CommandLine;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using System.Runtime.InteropServices;
+using ConsumerDBComponent;
+using ConsumerDBComponent.Common;
+using ConsumerDBComponent.Global;
+using CTCL.BinaryProtocol.Common.CMA.Enum;
+using CTCL.BinaryProtocol.Common.CMA.Response;
+using BinaryProtocol.Common;
+
+namespace ConsumerDbComponent
+{
+	class program
+	{
+		static void Main(string[] args)
+		{
+			new exitHook();
+			var cmdOption = Parser.Default.ParseArguments<CmdOptions>(args);
+            if (string.IsNullOrEmpty(cmdOption.Value.RequestID))
+            {
+                cmdOption.Value.RequestID =CTCL.Utility.UniqueId.GenerateRequestId((int)ComponentType.DBWriter, -1);
+            }
+			CommonHelper.RequestID = cmdOption.Value.RequestID;
+            ConsoleLog.ConsoleWrite("init, DB writing component!");
+			string QueueType = "";
+
+			if (cmdOption.Value.Type == "")
+			{
+				if (!Console.IsInputRedirected && RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+				{
+					ConsoleLog.ConsoleWrite("Insert the MQueueType(For Normal N and For DeadPool D):");
+					QueueType = Console.ReadLine();
+					if (QueueType?.ToLower() != "n" && QueueType?.ToLower() != "d")
+					{
+						ConsoleLog.ConsoleWrite("Please Insert Valid QueueType(D/N).");
+						Environment.Exit(0);
+					}
+					cmdOption.Value.Type = QueueType.ToLower();
+				}
+				else if (args != null && args.Length > 0)
+				{
+					cmdOption.Value.Type = args[0].ToLower();
+				}
+			}
+			else
+			{
+				if (cmdOption.Value.Type?.ToLower() != "n" && cmdOption.Value.Type?.ToLower() != "d")
+				{
+					ConsoleLog.ConsoleWrite("Please Insert Valid QueueType(D/N).");
+					Environment.Exit(0);
+				}
+			}
+            Console.Title = $"{ComponentType.DBWriter}_{-1}";
+
+            System.AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
+            IHost host = Host.CreateDefaultBuilder(args)
+			.UseWindowsService(config =>
+			{
+				config.ServiceName = "DBWBGS";
+			})
+			.ConfigureServices(services =>
+			{
+				services.AddHostedService<Worker>(services => new Worker(cmdOption.Value));
+                services.AddSingleton<IHostLifetime, NoopConsoleLifetime>();
+            })
+		   .Build();
+
+			host.Run();
+
+		}
+        private static void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
+        {
+            #region  DBwriter Start Process License Error
+            CMA_COMPONENT_MESSAGE_UPDATE omsstartlicense = new CMA_COMPONENT_MESSAGE_UPDATE();
+            Log.Error(e.ExceptionObject, "Unhandled Exception occured");
+            omsstartlicense = CommonHelper.getCMACompUpdateResponse(CMA_StatusCode.Stopped, $"{((Exception)e.ExceptionObject).Message}", CommonHelper.RequestID);
+
+            CommonHelper.SendGlobalExceptionToAgent(omsstartlicense);
+            #endregion
+        }     
+    }
+	public class CmdOptions
+	{
+		[Option('t', HelpText = "")]
+		public string Type { get; set; } = string.Empty;
+        [Option("rid", HelpText = "")]
+        public string RequestID { get; set; }
+    }
+}
+
+
+
+﻿
