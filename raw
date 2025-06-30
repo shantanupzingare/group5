@@ -343,3 +343,339 @@ namespace UserInterface.Services
         }
     }
 }
+
+
+
+
+
+
+﻿using BinaryProtocol.Common;
+using CTCL.BinaryProtocol.Common.BroadcastSystem;
+using System;
+using System.Collections.Generic;
+using System.Data.SqlClient;
+using System.Data;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using ConsumerDBComponent.Common;
+using static CTCL.BinaryProtocol.AssetManger.CTCL_AssetManger;
+using CTCL.BinaryProtocol.Common.CTCL.Common;
+
+namespace ConsumerDBComponent.MessageProcessor
+{
+    internal class BcastIndexProcessor
+    {
+        private SqlConnection PersistSqlConn;
+        private SqlTransaction tran;
+
+        public Response processBcastIndexMessageData(BCAST_MKT_INDEX BcastIndex)
+        {
+            Response response = new Response();
+
+            try
+            {
+                DataTable dt = new DataTable();
+
+                DataColumn COLUMN = new DataColumn();
+                COLUMN.ColumnName = "SegmentId";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "SegmentToken";
+                COLUMN.DataType = typeof(Int64);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "IndexName";
+                COLUMN.DataType = typeof(string);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "IndexValue";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "HighIndexValue";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "LowIndexValue";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "OpeningIndexValue";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "ClosingIndexValue";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "PercentChange";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "YearlyHigh";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "YearlyLow";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "UpMoves";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "DownMoves";
+                COLUMN.DataType = typeof(int);
+                dt.Columns.Add(COLUMN);
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "Capitalisation";
+                COLUMN.DataType = typeof(float);
+                dt.Columns.Add(COLUMN);
+
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "NeChange";
+                COLUMN.DataType = typeof(char);
+                dt.Columns.Add(COLUMN);
+
+
+               
+
+                COLUMN = new DataColumn();
+                COLUMN.ColumnName = "Filler1";
+                COLUMN.DataType = typeof(char);
+                dt.Columns.Add(COLUMN);
+
+
+                for (int i=0;i< BcastIndex.NoOfRecords.NoOfRecords;i++)
+                for (int i = 0; i < BcastIndex.NoOfRecords.NoOfRecords; i++)
+                {
+                    DataRow DR = dt.NewRow();
+                    DR[0] = BcastIndex.BroadcastMessageHeader.MessageHeader.ExchangeSegmentId.SegmentId;
+                    DR[10] = BcastIndex.Indexes[i].YearlyLow.IndexValue;
+                    DR[11] = BcastIndex.Indexes[i].UpMoves.NoOfMoves;
+                    DR[12] = BcastIndex.Indexes[i].DownMoves.NoOfMoves;
+                    DR[13] =BcastIndex.Indexes[i].Capitalisation.MarketCapitalisation;
+                    DR[14] = BcastIndex.Indexes[i].NetChangeIndicator.NetChangeIndicator[0];                  
+                    DR[13] = BcastIndex.Indexes[i].Capitalisation.MarketCapitalisation;
+                    DR[14] = BcastIndex.Indexes[i].NetChangeIndicator.NetChangeIndicator[0];
+                    DR[15] = BcastIndex.Indexes[i].Filler1.Filler1[0];
+                    DR[16] = DateTime.Now.Ticks;
+                    DR[17] = DateTime.Now.Ticks;
+                    dt.Rows.Add(DR);
+                }
+               
+
+                if (PersistSqlConn == null || PersistSqlConn.State != ConnectionState.Open)
+                try
+                {
+                    PersistSqlConn = new SqlConnection(Constant.DbConnectionString);
+                    PersistSqlConn.Open();
+                }
+                    if (PersistSqlConn == null || PersistSqlConn.State != ConnectionState.Open)
+                    {
+                        PersistSqlConn = new SqlConnection(Constant.DbConnectionString);
+                        PersistSqlConn.Open();
+                    }
+
+                using (tran = PersistSqlConn.BeginTransaction(System.Data.IsolationLevel.ReadCommitted))
+                {
+                    using (SqlConnection con = new SqlConnection(Constant.DbConnectionString))
+                    using (tran = PersistSqlConn.BeginTransaction(System.Data.IsolationLevel.ReadCommitted))
+                    {
+                        using (SqlCommand cmd = new SqlCommand("[dbo].[usp_MarketIndex_insupd]"))
+                        using (SqlConnection con = new SqlConnection(Constant.DbConnectionString))
+                        {
+                            cmd.CommandType = CommandType.StoredProcedure;
+                            cmd.Connection = con;
+                            cmd.Parameters.AddWithValue("@MarketIndex", dt);
+                            con.Open();
+                            cmd.ExecuteNonQuery();
+                            con.Close();
+                            using (SqlCommand cmd = new SqlCommand("[dbo].[usp_MarketIndex_insupd]"))
+                            {
+                                cmd.CommandType = CommandType.StoredProcedure;
+                                cmd.Connection = con;
+                                cmd.Parameters.AddWithValue("@MarketIndex", dt);
+                                con.Open();
+                                cmd.ExecuteNonQuery();
+                                con.Close();
+                            }
+                        }
+                    }
+
+                    tran.Commit();
+                        tran.Commit();
+
+                    }
+                    Log.Info("BCastIndex data saved to database.");
+                    return response.Set((BinaryProtocol.Common.StatusCode)StatusCode.Success, "BCastIndex data uploaded Sucessfully");
+                }
+                catch (Exception ex)
+                {
+                    PushDataForDeadPoolQ(BcastIndex);
+                    return response.Set(StatusCode.Failure, "Error Occured at BCastIndex Data Insert :" + ex.Message);
+                }
+                Log.Info("BCastIndex data saved to database.");
+                return response.Set((BinaryProtocol.Common.StatusCode)StatusCode.Success, "BCastIndex data uploaded Sucessfully");
+
+            }
+            catch (Exception ex)
+            {
+                return response.Set((BinaryProtocol.Common.StatusCode)StatusCode.Failure, "Error Occured at BCastIndex Data Insert :" + ex.Message);
+            }
+        }
+        internal bool PushDataForDeadPoolQ(BCAST_MKT_INDEX BcastIndex)
+        {
+            bool result = true;
+            bool response = true;
+
+            CommonMessagePublisher messagePublisher = new CommonMessagePublisher();
+            response = messagePublisher.PublishMessageInDeadPoolQ(BcastIndex); //publishing to DeadPoolQ
+            if (!response)
+            {
+                return result = false;
+            }
+            return result;
+
+
+        }
+
+    }
+}
+                DataTable dt = new DataTable();
+
+                if (dprUpdate.messageHeader.ExchangeSegmentId.SegmentId == (int)CTCL_ExchangeIdentifier.NSE_CM)
+                { 
+                {
+                    DataColumn COLUMN = new DataColumn();
+                    COLUMN.ColumnName = "intTokenNo";
+                    COLUMN.DataType = typeof(int);
+
+                    dt.Rows.Add(DR);
+                }
+
+                if (PersistSqlConn == null || PersistSqlConn.State != ConnectionState.Open)
+                { 
+                     PersistSqlConn = new SqlConnection(Constant.DbConnectionStringCTCLCommonDb);
+                     PersistSqlConn.Open();
+                }
+                
+
+                using (tran = PersistSqlConn.BeginTransaction(System.Data.IsolationLevel.ReadCommitted))
+                try
+                {
+                    using (SqlConnection con = new SqlConnection(Constant.DbConnectionStringCTCLCommonDb))
+                    if (PersistSqlConn == null || PersistSqlConn.State != ConnectionState.Open)
+                    {
+                        string procedureName = "";
+                        string typeParameter = "";
+                        
+                        if (dprUpdate.messageHeader.ExchangeSegmentId.SegmentId == (int)CTCL_ExchangeIdentifier.NSE_CM)
+                        {
+                            procedureName = "[dbo].[usp_UpdDPR_upd]";
+                            typeParameter = "@NSECMSecurityMasterDPR";
+                        PersistSqlConn = new SqlConnection(Constant.DbConnectionStringCTCLCommonDb);
+                        PersistSqlConn.Open();
+                    }
+
+                        }
+                        else if(dprUpdate.messageHeader.ExchangeSegmentId.SegmentId == (int)CTCL_ExchangeIdentifier.BSE_CM)
+                        {
+                            procedureName = "[dbo].[usp_BSE_UpdDPR_upd]";
+                            typeParameter = "@BSECMSecurityMasterDPR";
+                        }
+                        using (SqlCommand cmd = new SqlCommand(procedureName))
+
+                    using (tran = PersistSqlConn.BeginTransaction(System.Data.IsolationLevel.ReadCommitted))
+                    {
+                        using (SqlConnection con = new SqlConnection(Constant.DbConnectionStringCTCLCommonDb))
+                        {
+                            cmd.CommandType = CommandType.StoredProcedure;  
+                            cmd.Connection = con;
+                            cmd.Parameters.AddWithValue(typeParameter, dt);
+                            con.Open();
+                            cmd.ExecuteNonQuery();
+                            con.Close();
+                            string procedureName = "";
+                            string typeParameter = "";
+
+                            if (dprUpdate.messageHeader.ExchangeSegmentId.SegmentId == (int)CTCL_ExchangeIdentifier.NSE_CM)
+                            {
+                                procedureName = "[dbo].[usp_UpdDPR_upd]";
+                                typeParameter = "@NSECMSecurityMasterDPR";
+
+                            }
+                            else if (dprUpdate.messageHeader.ExchangeSegmentId.SegmentId == (int)CTCL_ExchangeIdentifier.BSE_CM)
+                            {
+                                procedureName = "[dbo].[usp_BSE_UpdDPR_upd]";
+                                typeParameter = "@BSECMSecurityMasterDPR";
+                            }
+                            using (SqlCommand cmd = new SqlCommand(procedureName))
+                            {
+                                cmd.CommandType = CommandType.StoredProcedure;
+                                cmd.Connection = con;
+                                cmd.Parameters.AddWithValue(typeParameter, dt);
+                                con.Open();
+                                cmd.ExecuteNonQuery();
+                                con.Close();
+                            }
+                        }
+                    }
+
+                    tran.Commit();
+                        tran.Commit();
+
+                    }
+                    Log.Info("DPR Update data saved to database.");
+                    return response.Set((BinaryProtocol.Common.StatusCode)StatusCode.Success, "BCastIndex data uploaded Sucessfully");
+                }
+                Log.Info("DPR Update data saved to database.");
+                return response.Set((BinaryProtocol.Common.StatusCode)StatusCode.Success, "BCastIndex data uploaded Sucessfully");
+
+                catch (Exception ex)
+                {
+                    PushDataForDeadPoolQ(dprUpdate);
+                    return response.Set(StatusCode.Failure, "Error Occured at BCastIndex Data Insert :" + ex.Message);
+                }           
+            }
+            catch (Exception ex)
+            {
+                return response.Set((BinaryProtocol.Common.StatusCode)StatusCode.Failure, "Error Occured at BCastIndex Data Insert :" + ex.Message);
+            }
+        }
+
+
+        internal bool PushDataForDeadPoolQ(CTCL_DPR_UPDATE dprUpdate)
+        {
+            bool result = true;
+            bool response = true;
+                       
+                CommonMessagePublisher messagePublisher = new CommonMessagePublisher();
+                response = messagePublisher.PublishMessageInDeadPoolQ(dprUpdate); //publishing to DeadPoolQ
+                if (!response)
+                {
+                    return result = false;
+                }
+            return result;
+           
+           
+        }
+    }
+}
+
