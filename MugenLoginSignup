@@ -11918,3 +11918,345 @@ namespace LoginSignupCore
 }
 
 
+using BinaryProtocol.Common;
+using LoginSignupCore.Core;
+using LoginSignupCore.MasterCache;
+using LoginSignupCore.Models.Response;
+using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
+using System.Data;
+using System.Security.Policy;
+
+namespace LoginSignupCore.Global
+{
+    public static class CacheOnLoad
+    {
+        public static void LoadAllCacheData()
+        {
+            GetAgentMasterData();
+            GetAgentWiseComponentMasterData();
+            GetAgentWiseFileInfoMasterData();
+            GetSiteWiseMasterData();
+            GetComponentStatus();
+            GetFileStatus();
+            GetCompTechnicalInfo();
+        }
+
+        public static Response GetAgentMasterData()
+        {
+            Response response = new Response();
+            DataSet ds;
+            ds = CommonHelper.ExecuteProcedureForDataSet("usp_GetAgentMaster");
+            if (ds == null)
+            {
+                return response.Set(StatusCode.OMS_Error, "Agent Master Info not loaded.");
+            }
+            FillAgentMasterInfoData(ds.Tables[0]);
+            return response.Set(StatusCode.OMS_Success, "Agent Master Info loaded.");
+        }
+        private static Response FillAgentMasterInfoData(DataTable dataTable)
+        {
+            Response response = new Response();
+            try
+            {
+                foreach (DataRow dr in dataTable.Rows)
+                {
+                    AgentSessionInfo agentSessionInfo = new();
+                    agentSessionInfo.AgentId = Convert.ToInt32(dr["intAgentId"] == DBNull.Value ? 0 : dr["intAgentId"]);
+                    agentSessionInfo.BrokerId = Convert.ToInt32(dr["intBrokerId"] == DBNull.Value ? 0 : dr["intBrokerId"]);
+                    agentSessionInfo.SiteId = Convert.ToInt32(dr["intBrokerSiteId"] == DBNull.Value ? 0 : dr["intBrokerSiteId"]);
+                    agentSessionInfo.IP = dr["nvcInstanceIP"] == DBNull.Value ? "" : dr["nvcInstanceIP"].ToString();
+                    agentSessionInfo.AgentName = dr["nvcAgentName"] == DBNull.Value ? "" : dr["nvcAgentName"].ToString();
+
+                    CoreProcess.agentSessionCache.AddOrUpdate(agentSessionInfo);
+                    CoreProcess.ipSessionCache.AddOrUpdate(agentSessionInfo);
+                }
+                return response.Set(StatusCode.Success, "Agent Master Info filled successfully.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Exception occured while fillingAgent Master Info cache");
+                return response.Set(StatusCode.Failure, "Failed to fill Agent Master Info Dictionary.");
+            }
+        }
+
+        public static Response GetAgentWiseComponentMasterData()
+        {
+            Response response = new Response();
+            DataSet ds;
+            ds = CommonHelper.ExecuteProcedureForDataSet("usp_GetAgentMasterWiseComponents");
+            if (ds == null)
+            {
+                return response.Set(StatusCode.OMS_Error, "Agent Wise ComponentMaster Info not loaded.");
+            }
+            FillAgentWiseComponentMasterData(ds.Tables[0]);
+            return response.Set(StatusCode.OMS_Success, "Agent Wise ComponentMaster Info loaded.");
+        }
+        private static Response FillAgentWiseComponentMasterData(DataTable dataTable)
+        {
+            Response response = new Response();
+            try
+            {
+                foreach (DataRow dr in dataTable.Rows)
+                {
+                    ComponentMaster compMaster = new();
+                    compMaster.AgentId = Convert.ToInt32(dr["intAgentId"] == DBNull.Value ? 0 : dr["intAgentId"]);
+                    compMaster.BrokerId = Convert.ToInt32(dr["intBrokerId"] == DBNull.Value ? 0 : dr["intBrokerId"]);
+                    compMaster.SiteId = Convert.ToInt32(dr["intBrokerSiteId"] == DBNull.Value ? 0 : dr["intBrokerSiteId"]);
+                    compMaster.ComponentId = Convert.ToInt32(dr["intComponentType"] == DBNull.Value ? 0 : dr["intComponentType"]);
+                    compMaster.InstanceId = Convert.ToInt32(dr["intInstanceId"] == DBNull.Value ? 0 : dr["intInstanceId"]);
+                    compMaster.ExePath = dr["nvcExePath"] == DBNull.Value ? "" : dr["nvcExePath"].ToString();
+                    compMaster.CmdParam = dr["nvcCmdParam"] == DBNull.Value ? "" : dr["nvcCmdParam"].ToString();
+                    compMaster.IsRunAsService = Convert.ToBoolean(dr["bitIsRunAsService"] == DBNull.Value ? 0 : dr["bitIsRunAsService"]);
+                    compMaster.ServiceName = dr["nvcServiceName"] == DBNull.Value ? "" : dr["nvcServiceName"].ToString();
+                    compMaster.Priority = Convert.ToInt32(dr["intPriority"] == DBNull.Value ? 0 : dr["intPriority"]);
+                    compMaster.CpuThresholdLimit = Convert.ToDouble(dr["numCpuThreshold"] == DBNull.Value ? 0 : dr["numCpuThreshold"]);
+                    compMaster.RamThresholdLimit = Convert.ToDouble(dr["numRamThreshold"] == DBNull.Value ? 0 : dr["numRamThreshold"]);
+                    compMaster.ComponentName = dr["nvcComponentName"] == DBNull.Value ? "" : dr["nvcComponentName"].ToString();
+                    compMaster.AgentName = dr["nvcAgentName"] == DBNull.Value ? "" : dr["nvcAgentName"].ToString();
+                    compMaster.IsActive = Convert.ToBoolean(dr["IsActive"] == DBNull.Value ? 0 : dr["IsActive"]);
+                    compMaster.IsDelete = Convert.ToBoolean(dr["IsDeleted"] == DBNull.Value ? 0 : dr["IsDeleted"]);
+                    CoreProcess.agentSessionCache.AddOrUpdate(compMaster);
+                }
+                return response.Set(StatusCode.Success, "Agent Wise Component Master Info filled successfully.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Exception occured while filling Agent Wise ComponentMaster Info cache");
+                return response.Set(StatusCode.Failure, "Failed to fill Agent Wise Component Master Info Dictionary.");
+            }
+        }
+
+        public static Response GetAgentWiseFileInfoMasterData()
+        {
+            Response response = new Response();
+            DataSet ds;
+            ds = CommonHelper.ExecuteProcedureForDataSet("usp_GetAgentToFileMappingMaster");
+            if (ds == null)
+            {
+                return response.Set(StatusCode.OMS_Error, "Agent Wise File Info Master not loaded.");
+            }
+            FillAgentWiseFileInfoMasterData(ds.Tables[0]);
+            return response.Set(StatusCode.OMS_Success, "Agent Wise File Info Master Info loaded.");
+        }
+        private static Response FillAgentWiseFileInfoMasterData(DataTable dataTable)
+        {
+            Response response = new Response();
+            try
+            {
+                foreach (DataRow dr in dataTable.Rows)
+                {
+                    FileMasterInfo fileMasterInfo = new();
+                    fileMasterInfo.AgentId = Convert.ToInt32(dr["intAgentId"] == DBNull.Value ? 0 : dr["intAgentId"]);
+                    fileMasterInfo.BrokerId = Convert.ToInt32(dr["intBrokerId"] == DBNull.Value ? 0 : dr["intBrokerId"]);
+                    fileMasterInfo.SiteId = Convert.ToInt32(dr["intBrokerSiteId"] == DBNull.Value ? 0 : dr["intBrokerSiteId"]);
+                    fileMasterInfo.SegmentId = Convert.ToInt32(dr["intSegmentId"] == DBNull.Value ? 0 : dr["intSegmentId"]);
+                    fileMasterInfo.FileType = Convert.ToInt32(dr["intFileType"] == DBNull.Value ? 0 : dr["intFileType"]);
+                    fileMasterInfo.FileName = dr["nvcFileName"] == DBNull.Value ? "" : dr["nvcFileName"].ToString();
+                    fileMasterInfo.Priority = Convert.ToInt32(dr["intPriority"] == DBNull.Value ? "" : dr["intPriority"]);
+                    fileMasterInfo.IsUploadBeforeBOD = Convert.ToBoolean(dr["isUploadBeforeBod"] == DBNull.Value ? 0 : dr["isUploadBeforeBod"]);
+                    fileMasterInfo.DestinationPath = dr["nvcDestinationPath"] == DBNull.Value ? "" : dr["nvcDestinationPath"].ToString();
+
+                    CoreProcess.agentSessionCache.AddOrUpdate(fileMasterInfo);
+                }
+                return response.Set(StatusCode.Success, "Agent Wise File Info Master filled successfully.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Exception occured while filling Agent Wise FileInfo Master cache");
+                return response.Set(StatusCode.Failure, "Failed to fill Agent Wise File Info Master Dictionary.");
+            }
+        }
+
+        public static Response GetSiteWiseMasterData()
+        {
+            Response response = new Response();
+            DataSet ds;
+            ds = CommonHelper.ExecuteProcedureForDataSet("usp_GetBrokerSites");
+            if (ds == null)
+            {
+                return response.Set(StatusCode.OMS_Error, "Site Wise Master Path not loaded.");
+            }
+            FillSiteWiseMasterData(ds.Tables[0]);
+            return response.Set(StatusCode.OMS_Success, "Site Wise Master Path Info loaded.");
+        }
+        private static Response FillSiteWiseMasterData(DataTable dataTable)
+        {
+            Response response = new Response();
+            try
+            {
+                foreach (DataRow dr in dataTable.Rows)
+                {
+                    int siteId = Convert.ToInt32(dr["id"] == DBNull.Value ? 0 : dr["id"]);
+                    int brokerId = Convert.ToInt32(dr["intBrokerId"] == DBNull.Value ? 0 : dr["intBrokerId"]);
+                    string masterPath = dr["nvcMasterFilePath"] == DBNull.Value ? "" : dr["nvcMasterFilePath"].ToString();
+
+                    CoreProcess.agentSessionCache.AddOrUpdate(brokerId, siteId, masterPath);
+                }
+                return response.Set(StatusCode.Success, "Site Wise Master Path filled successfully.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Exception occured while filling Site Wise Master Path cache");
+                return response.Set(StatusCode.Failure, "Failed to fill Site Wise Master Path Dictionary.");
+            }
+        }
+
+        public static Response GetComponentStatus()
+        {
+            Response response = new Response();
+            DataSet ds;
+            ds = CommonHelper.ExecuteProcedureForDataSet("usp_GetComponentStatus");
+            if (ds == null)
+            {
+                return response.Set(StatusCode.OMS_Error, "Component Status not loaded.");
+            }
+            FillComponentStatusData(ds.Tables[0]);
+            return response.Set(StatusCode.OMS_Success, "Component Status Info loaded.");
+        }
+        private static Response FillComponentStatusData(DataTable dataTable)
+        {
+            Response response = new Response();
+            try
+            {
+                foreach (DataRow dr in dataTable.Rows)
+                {
+                    ComponentStatus componentStatus = new()
+                    {
+                        AgentId = Convert.ToInt32(dr["intAgentId"] == DBNull.Value ? 0 : dr["intAgentId"]),
+                        BrokerId = Convert.ToInt32(dr["intBrokerId"] == DBNull.Value ? 0 : dr["intBrokerId"]),
+                        SiteId = Convert.ToInt32(dr["intSiteId"] == DBNull.Value ? 0 : dr["intSiteId"]),
+                        ComponentType = Convert.ToInt32(dr["intComponentId"] == DBNull.Value ? 0 : dr["intComponentId"]),
+                        InstanceId = Convert.ToInt32(dr["intInstanceId"] == DBNull.Value ? 0 : dr["intInstanceId"]),
+                        ComponentState = Convert.ToInt32(dr["intComponentState"] == DBNull.Value ? 0 : dr["intComponentState"]),
+                        TimeStamp = Convert.ToDateTime(dr["dtmUploadedOn"] == DBNull.Value ? 0 : dr["dtmUploadedOn"]),
+                        IsSucessStatus = Convert.ToBoolean(dr["bitIsSucessStatus"] == DBNull.Value ? 0 : dr["bitIsSucessStatus"]),
+                        Message = dr["nvcRemarks"] == DBNull.Value ? "" : dr["nvcRemarks"].ToString(),
+                        RequestId = dr["nvcRequestId"] == DBNull.Value ? "" : dr["nvcRequestId"].ToString()
+                    };
+
+                    CoreProcess.agentSessionCache.AddOrUpdate(componentStatus);
+
+                    char[] incrementingNumber = new char[14];
+                    char[] Id = componentStatus.RequestId?.ToCharArray();
+
+                    if(Id != null && Id.Length == 32)
+                    {
+                        Array.Copy(Id, 18, incrementingNumber, 0, incrementingNumber.Length);
+
+                        string strId = new(incrementingNumber);
+                        long nId = 0;
+
+                        if (long.TryParse(strId, out long nGatewayONO1) && incrementingNumber.Length > 0)
+                        {
+                            nId = Convert.ToInt64(strId);
+                        }
+
+                        if (Config.Id < nId)
+                        {
+                            Config.Id = nId;
+                        }
+                    }
+                }
+                return response.Set(StatusCode.Success, "Component Status filled successfully.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Exception occured while filling Component Status cache");
+                return response.Set(StatusCode.Failure, "Failed to fill Component Status Dictionary.");
+            }
+        }
+
+        public static Response GetFileStatus()
+        {
+            Response response = new Response();
+            DataSet ds;
+            ds = CommonHelper.ExecuteProcedureForDataSet("usp_GetFileStatus");
+            if (ds == null)
+            {
+                return response.Set(StatusCode.OMS_Error, "File Status not loaded.");
+            }
+            FillFileStatusData(ds.Tables[0]);
+            return response.Set(StatusCode.OMS_Success, "File Status Info loaded.");
+        }
+        private static Response FillFileStatusData(DataTable dataTable)
+        {
+            Response response = new Response();
+            try
+            {
+                foreach (DataRow dr in dataTable.Rows)
+                {
+                    FileStatus fileStatus = new()
+                    {
+                        AgentId = Convert.ToInt32(dr["intAgentId"] == DBNull.Value ? 0 : dr["intAgentId"]),
+                        BrokerId = Convert.ToInt32(dr["intBrokerId"] == DBNull.Value ? 0 : dr["intBrokerId"]),
+                        SiteId = Convert.ToInt32(dr["intSiteId"] == DBNull.Value ? 0 : dr["intSiteId"]),
+                        FileType = Convert.ToInt32(dr["intFileType"] == DBNull.Value ? 0 : dr["intFileType"]),
+                        Segment = Convert.ToInt32(dr["intSegment"] == DBNull.Value ? 0 : dr["intSegment"]),
+                        FileName = dr["nvcFileName"] == DBNull.Value ? "" : dr["nvcFileName"].ToString(),
+                        TimeStamp = Convert.ToDateTime(dr["dtmUploadedOn"] == DBNull.Value ? 0 : dr["dtmUploadedOn"]),
+                        IsSucessStatus = Convert.ToBoolean(dr["bitIsSucessStatus"] == DBNull.Value ? 0 : dr["bitIsSucessStatus"]),
+                        Message = dr["nvcRemarks"] == DBNull.Value ? "" : dr["nvcRemarks"].ToString()
+                    };
+
+                    CoreProcess.agentSessionCache.AddOrUpdate(fileStatus);
+                }
+                return response.Set(StatusCode.Success, "File Status filled successfully.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Exception occured while filling File Status cache");
+                return response.Set(StatusCode.Failure, "Failed to fill File Status Dictionary.");
+            }
+        }
+
+        public static Response GetCompTechnicalInfo()
+        {
+            Response response = new Response();
+            DataSet ds;
+            ds = CommonHelper.ExecuteProcedureForDataSet("usp_GetCompTechnicalInfo");
+            if (ds == null)
+            {
+                return response.Set(StatusCode.OMS_Error, "Comp Technical Info not loaded.");
+            }
+            FillCompTechnicalInfo(ds.Tables[0]);
+            return response.Set(StatusCode.OMS_Success, "Comp Technical Info loaded.");
+        }
+        private static Response FillCompTechnicalInfo(DataTable dataTable)
+        {
+            Response response = new Response();
+            try
+            {
+                foreach (DataRow dr in dataTable.Rows)
+                {
+                    ComponentsTechnicalInfo componentsTechnicalInfo = new()
+                    {
+                        AgentId = Convert.ToInt32(dr["intAgentId"] == DBNull.Value ? 0 : dr["intAgentId"]),
+                        BrokerId = Convert.ToInt32(dr["intBrokerId"] == DBNull.Value ? 0 : dr["intBrokerId"]),
+                        SiteId = Convert.ToInt32(dr["intSiteId"] == DBNull.Value ? 0 : dr["intSiteId"]),
+                        ComponentId = Convert.ToInt32(dr["intComponentId"] == DBNull.Value ? 0 : dr["intComponentId"]),
+                        InstanceId = Convert.ToInt32(dr["intInstanceId"] == DBNull.Value ? 0 : dr["intInstanceId"]),
+                        RAMUtilization = Convert.ToDouble(dr["numRamUtilization"] == DBNull.Value ? 0 : dr["numRamUtilization"]),
+                        CPUUtilization = Convert.ToDouble(dr["numCpuUtilization"] == DBNull.Value ? 0 : dr["numCpuUtilization"]),
+                        CPUHigh = Convert.ToDouble(dr["numCpuHigh"] == DBNull.Value ? 0 : dr["numCpuHigh"]),
+                        CPULow = Convert.ToDouble(dr["numCpuLow"] == DBNull.Value ? 0 : dr["numCpuLow"]),
+                        RAMHigh = Convert.ToDouble(dr["numRamHigh"] == DBNull.Value ? 0 : dr["numRamHigh"]),
+                        RAMLow = Convert.ToDouble(dr["numRamLow"] == DBNull.Value ? 0 : dr["numRamLow"]),
+                        Timestamp =(dr["dtmUpdatedOn"] == DBNull.Value ? "": dr["dtmUpdatedOn"]).ToString(),
+                       
+                    };
+                    componentsTechnicalInfo.ComponentName = ((ComponentType)componentsTechnicalInfo.ComponentId).ToString();
+                    componentsTechnicalInfo.AgentName =  CoreProcess.agentSessionCache.GetSession(componentsTechnicalInfo.BrokerId, componentsTechnicalInfo.SiteId, componentsTechnicalInfo.AgentId).Item2?.AgentName??string.Empty;
+
+                    CoreProcess.agentSessionCache.AddOrUpdate(componentsTechnicalInfo);
+                }
+                return response.Set(StatusCode.Success, "Comp Technical Info filled successfully.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Exception occured while filling Comp Technical Info cache");
+                return response.Set(StatusCode.Failure, "Failed to fill Comp Technical Info Dictionary.");
+            }
+        }
+    }
+}
