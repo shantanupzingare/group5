@@ -1,0 +1,149 @@
+using Microsoft.AspNetCore.Mvc;
+using MvcWebSocketDemo.Hubs;
+using Microsoft.AspNetCore.SignalR;
+
+namespace MvcWebSocketDemo.Controllers
+{
+    public class HomeController : Controller
+    {
+        private readonly IHubContext<NotificationHub> _hubContext;
+
+        public HomeController(IHubContext<NotificationHub> hubContext)
+        {
+            _hubContext = hubContext;
+        }
+
+        public IActionResult Index()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> BroadcastMessage(string user, string message)
+        {
+            await _hubContext.Clients.All.SendAsync("ReceiveMessage", user, message);
+            return RedirectToAction("Index");
+        }
+    }
+}
+
+
+
+
+using Microsoft.AspNetCore.SignalR;
+
+namespace MvcWebSocketDemo.Hubs
+{
+    public class NotificationHub : Hub
+    {
+        public async Task SendMessage(string user, string message)
+        {
+            await Clients.All.SendAsync("ReceiveMessage", user, message);
+        }
+    }
+}
+
+
+
+@{
+    ViewData["Title"] = "Real-Time Updates with SignalR";
+}
+
+<div class="text-center">
+    <h1 class="display-4">Real-Time Updates</h1>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="form-group">
+                <label for="userInput">User</label>
+                <input type="text" class="form-control" id="userInput" />
+            </div>
+            <div class="form-group">
+                <label for="messageInput">Message</label>
+                <input type="text" class="form-control" id="messageInput" />
+            </div>
+            <button type="button" class="btn btn-primary" id="sendButton">Send Message</button>
+        </div>
+        <div class="col-md-6">
+            <h3>Messages</h3>
+            <ul id="messagesList" class="list-group"></ul>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.1/signalr.min.js"></script>
+        <script>
+            const connection = new signalR.HubConnectionBuilder()
+                .withUrl("/notificationHub")
+                .configureLogging(signalR.LogLevel.Information)
+                .build();
+
+            connection.on("ReceiveMessage", (user, message) => {
+                const li = document.createElement("li");
+                li.className = "list-group-item";
+                li.textContent = `${user}: ${message}`;
+                document.getElementById("messagesList").appendChild(li);
+            });
+
+            async function start() {
+                try {
+                    await connection.start();
+                    console.log("SignalR Connected.");
+                } catch (err) {
+                    console.log(err);
+                    setTimeout(start, 5000);
+                }
+            };
+
+            connection.onclose(async () => {
+                await start();
+            });
+
+            start();
+
+            document.getElementById("sendButton").addEventListener("click", async (event) => {
+                const user = document.getElementById("userInput").value;
+                const message = document.getElementById("messageInput").value;
+                try {
+                    await connection.invoke("SendMessage", user, message);
+                } catch (err) {
+                    console.error(err);
+                }
+                event.preventDefault();
+            });
+        </script>
+}
+
+
+
+using MvcWebSocketDemo.Hubs;
+var builder = WebApplication.CreateBuilder(args);
+
+// Add services to the container.
+builder.Services.AddControllersWithViews();
+builder.Services.AddSignalR(); // Add this line
+
+var app = builder.Build();
+
+// Configure the HTTP request pipeline.
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Home/Error");
+    app.UseHsts();
+}
+
+app.UseHttpsRedirection();
+app.UseStaticFiles();
+
+app.UseRouting();
+
+app.UseAuthorization();
+
+app.MapControllerRoute(
+    name: "default",
+    pattern: "{controller=Home}/{action=Index}/{id?}");
+
+app.MapHub<NotificationHub>("/notificationHub"); // Add this line
+
+app.Run();
