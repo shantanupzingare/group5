@@ -1,0 +1,1466 @@
+using LoginSignupCore.Data;
+using LoginSignupCore.Models;
+using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
+using System.Reflection;
+using System.Security.Claims;
+
+namespace LoginSignupCore.Controllers
+{
+    public class AgentMasterController : Controller
+    {
+
+        private readonly AgentRepository _agentRepository;
+        public AgentMasterController()
+        {
+            _agentRepository = new();
+        }
+
+        [HttpGet]
+        public IActionResult Index()
+        {
+            return View();
+        }
+        [HttpGet]
+        public IActionResult AgentMaster()
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            return RedirectToAction("AgentMasters");
+
+        }
+        [HttpPost]
+        public IActionResult Agent(AgentMaster agentMaster)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            var agent = new AgentMaster()
+            {
+                AgentId = 0,
+                AgentName = agentMaster.AgentName,
+                BrokerId = agentMaster.BrokerId,
+                SiteName = agentMaster.SiteName,
+                BrokerSiteId = agentMaster.BrokerSiteId,
+                nvcInstanceIP = agentMaster.nvcInstanceIP,
+                DtmCreationDate = DateTime.Now,
+                IntCreatedBy = globals.User_ID,
+                Remarks = agentMaster.Remarks
+            };
+
+            //remove validation for other fields
+            //var requiredfields = typeof(AgentMaster).GetProperties().Where(p => Attribute.IsDefined(p, typeof(RequiredAttribute))).Select(p=>p.Name);
+            //foreach (var key in ModelState.Keys)
+            //{
+            //    if (!requiredfields.Contains(key) && ModelState[key].Errors.Count > 0)
+            //        ModelState[key].Errors.Clear();
+            //}
+
+            if (ModelState.IsValid)
+            {
+                try
+                {
+                    _agentRepository.InsertUpdateData(agent);
+                }
+                catch (Exception ex)
+                {
+                    throw;
+                }
+                BrokerSites sites = new BrokerSites()
+                {
+                    IntBrokerId = agentMaster.BrokerSiteId,
+                    Id = agentMaster.BrokerSiteId,
+                    NvcSiteName = agentMaster.SiteName
+                };
+                return RedirectToAction("AgentMasters", agentMaster);
+            }
+            else
+            {
+                foreach (var item in ModelState.Values.SelectMany(v => v.Errors))
+                {
+                    Console.WriteLine(item.ErrorMessage);
+                }
+                return RedirectToAction("AgentMasters", agentMaster);
+            }
+           
+            
+        }
+       
+        public IActionResult AgentMasters(AgentMaster master)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+
+            AgentMastersViewModel AgentsView = new();
+            try
+            {
+                AgentsView.Agents = _agentRepository.GetAllAgents(master.BrokerId, master.BrokerSiteId);
+                AgentsView.Agent = new();
+                AgentsView.Agent.BrokerSiteId = master.BrokerSiteId;
+                AgentsView.Agent.BrokerId = master.BrokerId;
+                AgentsView.Agent.SiteName = master.SiteName;
+                AgentsView.Agent.AgentId = master.AgentId;
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
+            return View(AgentsView);
+        }
+        //[HttpGet]
+        //public IActionResult AgentMasters(int siteid, int brokerid,string sitename)
+        //{
+        //    ClaimsPrincipal claimUser = HttpContext.User;
+        //    if (!claimUser.Identity.IsAuthenticated)
+        //    {
+        //        return RedirectToAction("Login", "Account");
+
+        //    }
+        //    AgentMastersViewModel AgentsView = new();
+        //    try
+        //    {
+        //        AgentsView.Agents = _agentRepository.GetAllAgents(brokerid, siteid);
+        //        AgentsView.Agent = new();
+        //        AgentsView.Agent.BrokerSiteId = siteid;
+        //        AgentsView.Agent.BrokerId = brokerid;
+        //        AgentsView.Agent.SiteName = sitename;
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        throw;
+        //    }
+        //    return View(AgentsView);
+        //}
+
+        [HttpGet("Agent/{id}/{sitename}")]
+        public IActionResult Agent(int id, string sitename)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            AgentMaster agentMaster = _agentRepository.GetAgentById(id);
+            return RedirectToAction("AgentMasters",agentMaster);
+        }
+        [HttpPost]
+        public IActionResult Edit(AgentMaster agentMaster)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+
+            int id = Convert.ToInt32(Request.Form["Id"]);
+            var IsActive = Request.Form["mvalue"];
+            ViewBag.mvalue = IsActive;
+            var agent = new AgentMaster()
+            {
+                AgentId = agentMaster.AgentId,
+                IsActive = agentMaster.IsActive,
+                DtmUpdationDate = DateTime.Now,
+                IntUpdatedBy = globals.User_ID,
+                Remarks = "Agent updated."
+            };
+            try
+            {
+                int rows = _agentRepository.UpdateIsActiveData(agent);
+                agentMaster.AgentId = 0;
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
+            return RedirectToAction("AgentMasters", agentMaster);
+        }
+        [HttpPost]
+        public IActionResult Update(AgentMaster agentMaster)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            var agent = new AgentMaster()
+            {
+                AgentId = agentMaster.AgentId,
+                AgentName = agentMaster.AgentName,
+                nvcInstanceIP = agentMaster.nvcInstanceIP,
+                DtmUpdationDate = DateTime.Now,
+                IntUpdatedBy = globals.User_ID,
+                Remarks = "Agent Updated."
+            };
+            try
+            {
+                int rows = _agentRepository.UpdateData(agent);
+                agentMaster.AgentId = 0;
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
+            return RedirectToAction("AgentMasters", agentMaster);
+
+        }
+        [HttpGet("AgentMaster/Delete/{id}/{bid}/{sid}/{sitename}")]
+        public IActionResult Delete(int id, int bid, int sid,string sitename)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            var agent = new AgentMaster()
+            {
+                AgentId = id,
+                BrokerId= bid,
+                BrokerSiteId=sid,
+                SiteName = sitename,
+                IsDeleted = 1,
+                DtmUpdationDate = DateTime.Now,
+                IntUpdatedBy = globals.User_ID,
+                Remarks = "Agent Deleted."
+            };
+            try
+            {
+                int rows = _agentRepository.DeleteData(agent);
+                agent.AgentId = 0;
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
+
+            return RedirectToAction("AgentMasters", agent);
+
+        }
+        [HttpGet("AgentMaster/UpdateIsActive/{id}/{bid}/{sid}")]
+        public IActionResult UpdateIsActive(int isActive, int bid, int sid)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            var agent = new AgentMaster()
+            {
+                AgentId = isActive,
+                IsDeleted = 1,
+                DtmUpdationDate = DateTime.Now,
+                IntUpdatedBy = globals.User_ID,
+                Remarks = "Agent updated."
+            };
+            try
+            {
+                int rows = _agentRepository.UpdateIsActiveData(agent);
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
+            return RedirectToAction("AgentMasters", new { siteid = sid, brokerid = bid });
+
+        }
+        [HttpGet]
+        public IActionResult AgentsStatus(int brokerid, int siteid)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            List<AgentMaster> AgentsView = new();
+            try
+            {
+                AgentsView = _agentRepository.GetAllAgents(brokerid,siteid );
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
+            return View(AgentsView);
+        }
+        [HttpGet("AgentMaster/AgentFile/{id}/{brid}/{sid}/{sitename}")]
+        public IActionResult AgentFile(int id,int brid,int sid, string sitename)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            AgentMaster agentMaster = _agentRepository.GetAgentById(id);
+            agentMaster.SiteName = sitename;
+            agentMaster.BrokerId = brid;
+            agentMaster.BrokerSiteId= sid;
+           
+            return PartialView("Agent", agentMaster);
+        }
+        public bool CheckAuth()
+        {
+            ClaimsPrincipal claimUser = HttpContext.User;
+            if (!claimUser.Identity.IsAuthenticated)
+            {
+                return false;
+            }
+            return true;
+        }
+    }
+}
+
+
+using Microsoft.AspNetCore.Mvc.ModelBinding;
+using System.ComponentModel.DataAnnotations;
+
+namespace LoginSignupCore.Models
+{
+    public partial class AgentMaster
+    {
+        public int AgentId { get; set; }
+        [Required(ErrorMessage="AgentName required")]
+        public string AgentName { get; set; }
+        public string? SiteName { get; set; }
+        public int BrokerId { get; set; }
+        public int BrokerSiteId { get; set; }
+        [Required(ErrorMessage = "nvcInstanceIP required")]
+        public string nvcInstanceIP { get; set; }
+        public int IsActive { get; set; }
+
+        public int IsDeleted { get; set; }
+
+        public int IntCreatedBy { get; set; }
+
+        public DateTime? DtmCreationDate { get; set; }
+
+        public int? IntUpdatedBy { get; set; }
+
+        public DateTime? DtmUpdationDate { get; set; }
+        public string Remarks { get; set; } 
+    }
+}
+
+
+using LoginSignupCore.Data;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.EntityFrameworkCore;
+using LoginSignupCore;
+using LoginSignupCore.Global;
+using LoginSignupCore.Core;
+
+var builder = WebApplication.CreateBuilder(args);
+new exitHook();
+// Add services to the container.
+builder.Services.AddHostedService<Worker>(services => new Worker());
+builder.Services.AddSingleton<IHostLifetime, NoopConsoleLifetime>();
+builder.Services.AddControllersWithViews();
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
+{
+	options.IdleTimeout = TimeSpan.FromMinutes(20);
+});
+
+builder.Services.AddSession(options=>
+{
+	options.IOTimeout= TimeSpan.FromMinutes(30);
+	options.Cookie.HttpOnly= true;
+	options.Cookie.IsEssential= true;
+});
+builder.Services.AddAuthentication(
+	CookieAuthenticationDefaults.AuthenticationScheme)
+	.AddCookie(option => {
+		option.LoginPath = "/Account/Login"; 
+		option.ExpireTimeSpan = TimeSpan.FromMinutes(20);
+	});
+
+builder.Services.AddDbContext<ApplicatonDBContext>(
+	options => { options.UseSqlServer(Config.connectionString); }
+	);
+var app = builder.Build();
+
+app.UseSession();
+
+
+// Configure the HTTP request pipeline.
+//if (!app.Environment.IsDevelopment())
+//{
+	//app.UseExceptionHandler("/Home/Error");
+	//// The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+	//app.UseHsts();
+//}
+
+//app.UseHttpsRedirection();
+app.UseStaticFiles();
+app.UseRouting();
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapControllerRoute(
+	name: "default",
+	pattern: "{controller=Account}/{action=Login}/{id?}");
+
+Config.GetConfigurationSettings();
+app.Urls.Add(Config.AppUrl);
+app.Run();
+
+
+
+
+using CTCL.Utility;
+using LoginSignupCore.Core;
+
+namespace LoginSignupCore
+{
+    public class Worker : BackgroundService
+    {
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            await CoreProcess.Initialize();
+            new ConsoleHelper();
+        }
+
+        /// <summary>
+        /// Executes when the service is ready to start.
+        /// </summary>
+        /// <param name="cancellationToken"><see cref="CancellationToken"/></param>
+        /// <returns><see cref="Task"/></returns>
+        public override Task StartAsync(CancellationToken cancellationToken)
+        {
+            return base.StartAsync(cancellationToken);
+        }
+    }
+    public class NoopConsoleLifetime : IHostLifetime, IDisposable
+    {
+        private readonly ILogger<NoopConsoleLifetime> _logger;
+
+        public NoopConsoleLifetime(ILogger<NoopConsoleLifetime> logger)
+        {
+            _logger = logger;
+        }
+
+        public Task StopAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task WaitForStartAsync(CancellationToken cancellationToken)
+        {
+            Console.CancelKeyPress += OnCancelKeyPressed;
+            return Task.CompletedTask;
+        }
+
+        private void OnCancelKeyPressed(object? sender, ConsoleCancelEventArgs e)
+        {
+            _logger.LogInformation("Ctrl+C has been pressed, ignoring.");
+            e.Cancel = true;
+        }
+
+        public void Dispose()
+        {
+            Console.CancelKeyPress -= OnCancelKeyPressed;
+        }
+    }
+    public class ConsoleHelper : exitHook
+    {
+        public ConsoleHelper()
+        {
+            new Thread(Process).Start();
+        }
+
+        private void Process()
+        {
+            while (true)
+            {
+                Console.WriteLine("Enter Your Choice");
+                var choice = GetChoice();
+                switch (choice)
+                {
+                    case -1:
+                        exitHookInit();
+                        break;
+                    default:
+                        Console.WriteLine("Wrong Choice");
+                        break;
+                }
+            }
+        }
+
+        private int GetChoice()
+        {
+            try
+            {
+                var res = Convert.ToInt32(Console.ReadLine());
+                return res;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Plz enter a number only");
+                return GetChoice();
+            }
+        }
+        private void exitHookInit()
+        {
+            string strExitconfirm;
+            Console.WriteLine("Are you sure you want to exit y/n ");
+            strExitconfirm = Console.ReadLine();
+            if (strExitconfirm?.ToLower() == "y")
+            {
+                Environment.Exit(0);
+            }
+            else
+            {
+                // ask();
+            }
+        }
+    }
+}
+
+
+
+using BinaryProtocol.Common;
+using LoginSignupCore.Core;
+using LoginSignupCore.MasterCache;
+using LoginSignupCore.Models.Response;
+using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
+using System.Data;
+using System.Security.Policy;
+
+namespace LoginSignupCore.Global
+{
+    public static class CacheOnLoad
+    {
+        public static void LoadAllCacheData()
+        {
+            GetAgentMasterData();
+            GetAgentWiseComponentMasterData();
+            GetAgentWiseFileInfoMasterData();
+            GetSiteWiseMasterData();
+            GetComponentStatus();
+            GetFileStatus();
+            GetCompTechnicalInfo();
+        }
+
+        public static Response GetAgentMasterData()
+        {
+            Response response = new Response();
+            DataSet ds;
+            ds = CommonHelper.ExecuteProcedureForDataSet("usp_GetAgentMaster");
+            if (ds == null)
+            {
+                return response.Set(StatusCode.OMS_Error, "Agent Master Info not loaded.");
+            }
+            FillAgentMasterInfoData(ds.Tables[0]);
+            return response.Set(StatusCode.OMS_Success, "Agent Master Info loaded.");
+        }
+        private static Response FillAgentMasterInfoData(DataTable dataTable)
+        {
+            Response response = new Response();
+            try
+            {
+                foreach (DataRow dr in dataTable.Rows)
+                {
+                    AgentSessionInfo agentSessionInfo = new();
+                    agentSessionInfo.AgentId = Convert.ToInt32(dr["intAgentId"] == DBNull.Value ? 0 : dr["intAgentId"]);
+                    agentSessionInfo.BrokerId = Convert.ToInt32(dr["intBrokerId"] == DBNull.Value ? 0 : dr["intBrokerId"]);
+                    agentSessionInfo.SiteId = Convert.ToInt32(dr["intBrokerSiteId"] == DBNull.Value ? 0 : dr["intBrokerSiteId"]);
+                    agentSessionInfo.IP = dr["nvcInstanceIP"] == DBNull.Value ? "" : dr["nvcInstanceIP"].ToString();
+                    agentSessionInfo.AgentName = dr["nvcAgentName"] == DBNull.Value ? "" : dr["nvcAgentName"].ToString();
+
+                    CoreProcess.agentSessionCache.AddOrUpdate(agentSessionInfo);
+                    CoreProcess.ipSessionCache.AddOrUpdate(agentSessionInfo);
+                }
+                return response.Set(StatusCode.Success, "Agent Master Info filled successfully.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Exception occured while fillingAgent Master Info cache");
+                return response.Set(StatusCode.Failure, "Failed to fill Agent Master Info Dictionary.");
+            }
+        }
+
+        public static Response GetAgentWiseComponentMasterData()
+        {
+            Response response = new Response();
+            DataSet ds;
+            ds = CommonHelper.ExecuteProcedureForDataSet("usp_GetAgentMasterWiseComponents");
+            if (ds == null)
+            {
+                return response.Set(StatusCode.OMS_Error, "Agent Wise ComponentMaster Info not loaded.");
+            }
+            FillAgentWiseComponentMasterData(ds.Tables[0]);
+            return response.Set(StatusCode.OMS_Success, "Agent Wise ComponentMaster Info loaded.");
+        }
+        private static Response FillAgentWiseComponentMasterData(DataTable dataTable)
+        {
+            Response response = new Response();
+            try
+            {
+                foreach (DataRow dr in dataTable.Rows)
+                {
+                    ComponentMaster compMaster = new();
+                    compMaster.AgentId = Convert.ToInt32(dr["intAgentId"] == DBNull.Value ? 0 : dr["intAgentId"]);
+                    compMaster.BrokerId = Convert.ToInt32(dr["intBrokerId"] == DBNull.Value ? 0 : dr["intBrokerId"]);
+                    compMaster.SiteId = Convert.ToInt32(dr["intBrokerSiteId"] == DBNull.Value ? 0 : dr["intBrokerSiteId"]);
+                    compMaster.ComponentId = Convert.ToInt32(dr["intComponentType"] == DBNull.Value ? 0 : dr["intComponentType"]);
+                    compMaster.InstanceId = Convert.ToInt32(dr["intInstanceId"] == DBNull.Value ? 0 : dr["intInstanceId"]);
+                    compMaster.ExePath = dr["nvcExePath"] == DBNull.Value ? "" : dr["nvcExePath"].ToString();
+                    compMaster.CmdParam = dr["nvcCmdParam"] == DBNull.Value ? "" : dr["nvcCmdParam"].ToString();
+                    compMaster.IsRunAsService = Convert.ToBoolean(dr["bitIsRunAsService"] == DBNull.Value ? 0 : dr["bitIsRunAsService"]);
+                    compMaster.ServiceName = dr["nvcServiceName"] == DBNull.Value ? "" : dr["nvcServiceName"].ToString();
+                    compMaster.Priority = Convert.ToInt32(dr["intPriority"] == DBNull.Value ? 0 : dr["intPriority"]);
+                    compMaster.CpuThresholdLimit = Convert.ToDouble(dr["numCpuThreshold"] == DBNull.Value ? 0 : dr["numCpuThreshold"]);
+                    compMaster.RamThresholdLimit = Convert.ToDouble(dr["numRamThreshold"] == DBNull.Value ? 0 : dr["numRamThreshold"]);
+                    compMaster.ComponentName = dr["nvcComponentName"] == DBNull.Value ? "" : dr["nvcComponentName"].ToString();
+                    compMaster.AgentName = dr["nvcAgentName"] == DBNull.Value ? "" : dr["nvcAgentName"].ToString();
+                    compMaster.IsActive = Convert.ToBoolean(dr["IsActive"] == DBNull.Value ? 0 : dr["IsActive"]);
+                    compMaster.IsDelete = Convert.ToBoolean(dr["IsDeleted"] == DBNull.Value ? 0 : dr["IsDeleted"]);
+                    CoreProcess.agentSessionCache.AddOrUpdate(compMaster);
+                }
+                return response.Set(StatusCode.Success, "Agent Wise Component Master Info filled successfully.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Exception occured while filling Agent Wise ComponentMaster Info cache");
+                return response.Set(StatusCode.Failure, "Failed to fill Agent Wise Component Master Info Dictionary.");
+            }
+        }
+
+        public static Response GetAgentWiseFileInfoMasterData()
+        {
+            Response response = new Response();
+            DataSet ds;
+            ds = CommonHelper.ExecuteProcedureForDataSet("usp_GetAgentToFileMappingMaster");
+            if (ds == null)
+            {
+                return response.Set(StatusCode.OMS_Error, "Agent Wise File Info Master not loaded.");
+            }
+            FillAgentWiseFileInfoMasterData(ds.Tables[0]);
+            return response.Set(StatusCode.OMS_Success, "Agent Wise File Info Master Info loaded.");
+        }
+        private static Response FillAgentWiseFileInfoMasterData(DataTable dataTable)
+        {
+            Response response = new Response();
+            try
+            {
+                foreach (DataRow dr in dataTable.Rows)
+                {
+                    FileMasterInfo fileMasterInfo = new();
+                    fileMasterInfo.AgentId = Convert.ToInt32(dr["intAgentId"] == DBNull.Value ? 0 : dr["intAgentId"]);
+                    fileMasterInfo.BrokerId = Convert.ToInt32(dr["intBrokerId"] == DBNull.Value ? 0 : dr["intBrokerId"]);
+                    fileMasterInfo.SiteId = Convert.ToInt32(dr["intBrokerSiteId"] == DBNull.Value ? 0 : dr["intBrokerSiteId"]);
+                    fileMasterInfo.SegmentId = Convert.ToInt32(dr["intSegmentId"] == DBNull.Value ? 0 : dr["intSegmentId"]);
+                    fileMasterInfo.FileType = Convert.ToInt32(dr["intFileType"] == DBNull.Value ? 0 : dr["intFileType"]);
+                    fileMasterInfo.FileName = dr["nvcFileName"] == DBNull.Value ? "" : dr["nvcFileName"].ToString();
+                    fileMasterInfo.Priority = Convert.ToInt32(dr["intPriority"] == DBNull.Value ? "" : dr["intPriority"]);
+                    fileMasterInfo.IsUploadBeforeBOD = Convert.ToBoolean(dr["isUploadBeforeBod"] == DBNull.Value ? 0 : dr["isUploadBeforeBod"]);
+                    fileMasterInfo.DestinationPath = dr["nvcDestinationPath"] == DBNull.Value ? "" : dr["nvcDestinationPath"].ToString();
+
+                    CoreProcess.agentSessionCache.AddOrUpdate(fileMasterInfo);
+                }
+                return response.Set(StatusCode.Success, "Agent Wise File Info Master filled successfully.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Exception occured while filling Agent Wise FileInfo Master cache");
+                return response.Set(StatusCode.Failure, "Failed to fill Agent Wise File Info Master Dictionary.");
+            }
+        }
+
+        public static Response GetSiteWiseMasterData()
+        {
+            Response response = new Response();
+            DataSet ds;
+            ds = CommonHelper.ExecuteProcedureForDataSet("usp_GetBrokerSites");
+            if (ds == null)
+            {
+                return response.Set(StatusCode.OMS_Error, "Site Wise Master Path not loaded.");
+            }
+            FillSiteWiseMasterData(ds.Tables[0]);
+            return response.Set(StatusCode.OMS_Success, "Site Wise Master Path Info loaded.");
+        }
+        private static Response FillSiteWiseMasterData(DataTable dataTable)
+        {
+            Response response = new Response();
+            try
+            {
+                foreach (DataRow dr in dataTable.Rows)
+                {
+                    int siteId = Convert.ToInt32(dr["id"] == DBNull.Value ? 0 : dr["id"]);
+                    int brokerId = Convert.ToInt32(dr["intBrokerId"] == DBNull.Value ? 0 : dr["intBrokerId"]);
+                    string masterPath = dr["nvcMasterFilePath"] == DBNull.Value ? "" : dr["nvcMasterFilePath"].ToString();
+
+                    CoreProcess.agentSessionCache.AddOrUpdate(brokerId, siteId, masterPath);
+                }
+                return response.Set(StatusCode.Success, "Site Wise Master Path filled successfully.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Exception occured while filling Site Wise Master Path cache");
+                return response.Set(StatusCode.Failure, "Failed to fill Site Wise Master Path Dictionary.");
+            }
+        }
+
+        public static Response GetComponentStatus()
+        {
+            Response response = new Response();
+            DataSet ds;
+            ds = CommonHelper.ExecuteProcedureForDataSet("usp_GetComponentStatus");
+            if (ds == null)
+            {
+                return response.Set(StatusCode.OMS_Error, "Component Status not loaded.");
+            }
+            FillComponentStatusData(ds.Tables[0]);
+            return response.Set(StatusCode.OMS_Success, "Component Status Info loaded.");
+        }
+        private static Response FillComponentStatusData(DataTable dataTable)
+        {
+            Response response = new Response();
+            try
+            {
+                foreach (DataRow dr in dataTable.Rows)
+                {
+                    ComponentStatus componentStatus = new()
+                    {
+                        AgentId = Convert.ToInt32(dr["intAgentId"] == DBNull.Value ? 0 : dr["intAgentId"]),
+                        BrokerId = Convert.ToInt32(dr["intBrokerId"] == DBNull.Value ? 0 : dr["intBrokerId"]),
+                        SiteId = Convert.ToInt32(dr["intSiteId"] == DBNull.Value ? 0 : dr["intSiteId"]),
+                        ComponentType = Convert.ToInt32(dr["intComponentId"] == DBNull.Value ? 0 : dr["intComponentId"]),
+                        InstanceId = Convert.ToInt32(dr["intInstanceId"] == DBNull.Value ? 0 : dr["intInstanceId"]),
+                        ComponentState = Convert.ToInt32(dr["intComponentState"] == DBNull.Value ? 0 : dr["intComponentState"]),
+                        TimeStamp = Convert.ToDateTime(dr["dtmUploadedOn"] == DBNull.Value ? 0 : dr["dtmUploadedOn"]),
+                        IsSucessStatus = Convert.ToBoolean(dr["bitIsSucessStatus"] == DBNull.Value ? 0 : dr["bitIsSucessStatus"]),
+                        Message = dr["nvcRemarks"] == DBNull.Value ? "" : dr["nvcRemarks"].ToString(),
+                        RequestId = dr["nvcRequestId"] == DBNull.Value ? "" : dr["nvcRequestId"].ToString()
+                    };
+
+                    CoreProcess.agentSessionCache.AddOrUpdate(componentStatus);
+
+                    char[] incrementingNumber = new char[14];
+                    char[] Id = componentStatus.RequestId?.ToCharArray();
+
+                    if(Id != null && Id.Length == 32)
+                    {
+                        Array.Copy(Id, 18, incrementingNumber, 0, incrementingNumber.Length);
+
+                        string strId = new(incrementingNumber);
+                        long nId = 0;
+
+                        if (long.TryParse(strId, out long nGatewayONO1) && incrementingNumber.Length > 0)
+                        {
+                            nId = Convert.ToInt64(strId);
+                        }
+
+                        if (Config.Id < nId)
+                        {
+                            Config.Id = nId;
+                        }
+                    }
+                }
+                return response.Set(StatusCode.Success, "Component Status filled successfully.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Exception occured while filling Component Status cache");
+                return response.Set(StatusCode.Failure, "Failed to fill Component Status Dictionary.");
+            }
+        }
+
+        public static Response GetFileStatus()
+        {
+            Response response = new Response();
+            DataSet ds;
+            ds = CommonHelper.ExecuteProcedureForDataSet("usp_GetFileStatus");
+            if (ds == null)
+            {
+                return response.Set(StatusCode.OMS_Error, "File Status not loaded.");
+            }
+            FillFileStatusData(ds.Tables[0]);
+            return response.Set(StatusCode.OMS_Success, "File Status Info loaded.");
+        }
+        private static Response FillFileStatusData(DataTable dataTable)
+        {
+            Response response = new Response();
+            try
+            {
+                foreach (DataRow dr in dataTable.Rows)
+                {
+                    FileStatus fileStatus = new()
+                    {
+                        AgentId = Convert.ToInt32(dr["intAgentId"] == DBNull.Value ? 0 : dr["intAgentId"]),
+                        BrokerId = Convert.ToInt32(dr["intBrokerId"] == DBNull.Value ? 0 : dr["intBrokerId"]),
+                        SiteId = Convert.ToInt32(dr["intSiteId"] == DBNull.Value ? 0 : dr["intSiteId"]),
+                        FileType = Convert.ToInt32(dr["intFileType"] == DBNull.Value ? 0 : dr["intFileType"]),
+                        Segment = Convert.ToInt32(dr["intSegment"] == DBNull.Value ? 0 : dr["intSegment"]),
+                        FileName = dr["nvcFileName"] == DBNull.Value ? "" : dr["nvcFileName"].ToString(),
+                        TimeStamp = Convert.ToDateTime(dr["dtmUploadedOn"] == DBNull.Value ? 0 : dr["dtmUploadedOn"]),
+                        IsSucessStatus = Convert.ToBoolean(dr["bitIsSucessStatus"] == DBNull.Value ? 0 : dr["bitIsSucessStatus"]),
+                        Message = dr["nvcRemarks"] == DBNull.Value ? "" : dr["nvcRemarks"].ToString()
+                    };
+
+                    CoreProcess.agentSessionCache.AddOrUpdate(fileStatus);
+                }
+                return response.Set(StatusCode.Success, "File Status filled successfully.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Exception occured while filling File Status cache");
+                return response.Set(StatusCode.Failure, "Failed to fill File Status Dictionary.");
+            }
+        }
+
+        public static Response GetCompTechnicalInfo()
+        {
+            Response response = new Response();
+            DataSet ds;
+            ds = CommonHelper.ExecuteProcedureForDataSet("usp_GetCompTechnicalInfo");
+            if (ds == null)
+            {
+                return response.Set(StatusCode.OMS_Error, "Comp Technical Info not loaded.");
+            }
+            FillCompTechnicalInfo(ds.Tables[0]);
+            return response.Set(StatusCode.OMS_Success, "Comp Technical Info loaded.");
+        }
+        private static Response FillCompTechnicalInfo(DataTable dataTable)
+        {
+            Response response = new Response();
+            try
+            {
+                foreach (DataRow dr in dataTable.Rows)
+                {
+                    ComponentsTechnicalInfo componentsTechnicalInfo = new()
+                    {
+                        AgentId = Convert.ToInt32(dr["intAgentId"] == DBNull.Value ? 0 : dr["intAgentId"]),
+                        BrokerId = Convert.ToInt32(dr["intBrokerId"] == DBNull.Value ? 0 : dr["intBrokerId"]),
+                        SiteId = Convert.ToInt32(dr["intSiteId"] == DBNull.Value ? 0 : dr["intSiteId"]),
+                        ComponentId = Convert.ToInt32(dr["intComponentId"] == DBNull.Value ? 0 : dr["intComponentId"]),
+                        InstanceId = Convert.ToInt32(dr["intInstanceId"] == DBNull.Value ? 0 : dr["intInstanceId"]),
+                        RAMUtilization = Convert.ToDouble(dr["numRamUtilization"] == DBNull.Value ? 0 : dr["numRamUtilization"]),
+                        CPUUtilization = Convert.ToDouble(dr["numCpuUtilization"] == DBNull.Value ? 0 : dr["numCpuUtilization"]),
+                        CPUHigh = Convert.ToDouble(dr["numCpuHigh"] == DBNull.Value ? 0 : dr["numCpuHigh"]),
+                        CPULow = Convert.ToDouble(dr["numCpuLow"] == DBNull.Value ? 0 : dr["numCpuLow"]),
+                        RAMHigh = Convert.ToDouble(dr["numRamHigh"] == DBNull.Value ? 0 : dr["numRamHigh"]),
+                        RAMLow = Convert.ToDouble(dr["numRamLow"] == DBNull.Value ? 0 : dr["numRamLow"]),
+                        Timestamp =(dr["dtmUpdatedOn"] == DBNull.Value ? "": dr["dtmUpdatedOn"]).ToString(),
+                       
+                    };
+                    componentsTechnicalInfo.ComponentName = ((ComponentType)componentsTechnicalInfo.ComponentId).ToString();
+                    componentsTechnicalInfo.AgentName =  CoreProcess.agentSessionCache.GetSession(componentsTechnicalInfo.BrokerId, componentsTechnicalInfo.SiteId, componentsTechnicalInfo.AgentId).Item2?.AgentName??string.Empty;
+
+                    CoreProcess.agentSessionCache.AddOrUpdate(componentsTechnicalInfo);
+                }
+                return response.Set(StatusCode.Success, "Comp Technical Info filled successfully.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Exception occured while filling Comp Technical Info cache");
+                return response.Set(StatusCode.Failure, "Failed to fill Comp Technical Info Dictionary.");
+            }
+        }
+    }
+}
+
+
+
+@model AgentMastersViewModel
+
+
+<div class="cstm_heading">
+    <h1>
+       @*  <a asp-controller="brokermaster" asp-action="displaydata">
+           <button type="button" class="action-btn">
+            <i class="bi bi-arrow-bar-left"></i>
+            </button>
+        </a>  *@
+        <a href="/BrokerSite/BrokerSites">
+            <i class="bi bi-arrow-bar-left"></i>
+        </a>
+
+        Agents</h1>
+    @* <a class="add_btn" asp-action="file" asp-controller="filemaster"> *@
+        <div>
+        <a class="add_btn" id="showAddView">
+            <i class="bi bi-plus-square"></i>
+            Add New Agent
+        </a>
+        
+        </div>
+   
+</div>
+
+
+@* <div id="FormView" class="viewPanel" style="display:none"></div>*@
+
+@{
+    if (Model.Agent.AgentId != 0)
+    {
+        <div id="FormView" class="viewPanel" style="display:block"></div>
+    }
+    else
+    {
+        <div id="FormView" class="viewPanel" style="display:none"></div>
+    }
+}
+
+
+<div>
+
+
+    <div class="table-responsive cstm_tbl">
+        <table class="table dataTable">
+            <thead>
+                <tr>
+                    @* <th> Id </th> *@
+                    <th> Agent Name </th>
+                    <th> Instance IP </th>
+                    <th> Active </th>
+                    <th> Action </th>
+                    <th> Components </th>
+                    <th> Files </th>
+                </tr>
+            </thead>
+            @if (Model != null)
+            {
+
+
+                @foreach (var AgentModel in Model.Agents)
+                {
+                    <form id="formsites" asp-controller="AgentMaster" asp-action="Edit" method="post">
+                    <tr>
+                        @* <td> @AgentModel.AgentId </td> *@
+                        <td> @AgentModel.AgentName </td>
+                        <td> @AgentModel.nvcInstanceIP </td>
+                        
+
+                            @if (AgentModel.IsActive == 1)
+                            {
+
+                            <td>
+                                <input id="AgentId" name="AgentId" type="hidden" value="@AgentModel.AgentId" />
+                                <input id="AgentName" name="AgentName" type="hidden" value="@AgentModel.AgentName" />
+                                <input id="BrokerId" name="BrokerId" type="hidden" value="@AgentModel.BrokerId" />
+                                <input id="BrokerSiteId" name="BrokerSiteId" type="hidden" value="@AgentModel.BrokerSiteId" />
+                                <input id="IsActive" name="IsActive" type="hidden" value=0 />
+                                <button type="submit" asp-controller="AgentMaster" asp-action="Edit" onclick="getConfirmationlocal();" class="btn btn-success activ_btn" title="Active">Deactivate</button>
+                            </td>
+                            }
+                            else
+                            {
+
+
+                            <td>
+                                <input id="AgentId" name="AgentId" type="hidden" value="@AgentModel.AgentId" />
+                                <input id="AgentName" name="AgentName" type="hidden" value="@AgentModel.AgentName" />
+                                <input id="BrokerId" name="BrokerId" type="hidden" value="@AgentModel.BrokerId" />
+                                <input id="BrokerSiteId" name="BrokerSiteId" type="hidden" value="@AgentModel.BrokerSiteId" />
+                                <input id="IsActive" name="IsActive" type="hidden" value=1 />
+                                <button type="submit" asp-controller="AgentMaster" asp-action="Edit" onclick="getConfirmationlocal();" class="btn btn-warning activ_btn" title="DeActive">Activate</button>
+                            </td>
+                            }
+                        <td class="action_td">
+                            <input type="hidden" name="AgentId"    value="@AgentModel.AgentId" />
+                            <input type="hidden" name="AgentName"  value="@AgentModel.AgentName" />
+                            <input type="hidden" name="BrokerId"   value="@AgentModel.BrokerId" />
+                            <input type="hidden" name="BrokerSiteId" value="@AgentModel.BrokerSiteId" />
+                            <input type="hidden" name="SiteName" value="@Model.Agent.SiteName" />
+                            <input type="hidden" name="IsActive" value="@AgentModel.IsActive" />
+                            <button type="submit" class="edit_action" title ="update Agents" asp-controller="AgentMaster" asp-action="AgentMasters">
+                                <i class="bi bi-pencil-square"></i>
+                            </button>
+ 
+                           
+
+                            <a title="Delete Agent" asp-controller="AgentMaster" asp-action="Delete" asp-route-id="@AgentModel.AgentId" asp-route-bid="@AgentModel.BrokerId" asp-route-sid="@AgentModel.BrokerSiteId" asp-route-sitename="@Model.Agent.SiteName">
+                                <i class="bi bi-archive"></i>
+                            </a>
+                        </td>
+                        <td class="">
+
+                            <a class="nav-link" href="@Url.Action("ComponentsMaster","ComponentAssign",new {agentId=@AgentModel.AgentId,brokerid=@AgentModel.BrokerId,siteid=@AgentModel.BrokerSiteId})">
+                                <button type="button" class="action-btn" title="View Components"><i class="bi bi-view-list"></i></button>
+                            </a> 
+                        </td>
+                        <td>
+                            <a class="nav-link" href="@Url.Action("AgentWiseFileMaster","AgentwiseFiles",new {agentId=@AgentModel.AgentId,brokerid=@AgentModel.BrokerId,siteid=@AgentModel.BrokerSiteId})">
+                                <button type="button" class="action-btn" title="View Files"><i class="bi bi-file-earmark-diff"></i></button>
+                            </a>
+
+                        </td>
+                        
+                    </tr>
+                    </form>
+                }
+            }
+        </table>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    $(document).ready(function () {
+        //alert("test");
+        debugger
+        $.ajax({
+            url: '@Url.Action("AgentFile","AgentMaster",new { id = Model.Agent.AgentId,brid=Model.Agent.BrokerId,sid=Model.Agent.BrokerSiteId,sitename=Model.Agent.SiteName})',
+
+            type: 'GET',
+            success: function (result) {
+                $('#FormView').html(result);
+            }
+        });
+
+
+    });
+    function getConfirmationlocal() {
+
+        if (!confirm('Do you want to save the changes..?')) {
+            return false;
+        }
+        else {
+            document.getElementById("formsites").submit();
+        }
+    }
+</script>
+
+
+
+@model AgentMaster
+<div>
+	@if (@Model != null && @Model.AgentId == 0)
+	{
+		
+		<div>
+
+			<form id="form1" asp-controller="AgentMaster" asp-action="Agent" method="post" onsubmit="submmitForm(event)">
+				<input type="hidden" asp-for="AgentId" />
+				<input type="hidden" asp-for="AgentId" value="@Model.AgentId" />
+				<input type="hidden" asp-for="BrokerId" value="@Model.BrokerId" />
+				<input type="hidden" asp-for="BrokerSiteId" value="@Model.BrokerSiteId" />
+				<input type="hidden" asp-for="SiteName" value="@Model.SiteName" />
+				<div class="row">
+					<div class="col-lg-3 col-sm-12">
+						<div class="form-group">
+							<label>Site Name</label>
+							<input disabled asp-for="SiteName" class="form-control" id="SiteName" name="SiteName" value="@Model.SiteName">
+
+						</div>
+					</div>
+					<div class="col-lg-3 col-sm-12">
+						<div class="form-group">
+							<label>Agent Name</label>
+							<input asp-for="AgentName" class="form-control" id="AgentName" name="AgentName" value="@Model.AgentName">
+							<span asp-validation-for="AgentName" class="text-danger"></span>
+						</div>
+					</div>
+					<div class="col-lg-3 col-sm-12">
+
+						<div class="form-group">
+							<label>Instance IP</label>
+							<input asp-for="nvcInstanceIP" class="form-control" id="nvcInstanceIP" name="nvcInstanceIP" value="@Model.nvcInstanceIP">
+							<span asp-validation-for="nvcInstanceIP" class="text-danger"></span>
+						</div>
+					</div>
+					<div class="col-lg-3 col-sm-12">
+
+
+						<div class="form-group">
+							<label>Remark</label>
+							<input asp-for="Remarks" class="form-control" id="Remarks" name="Remarks" value="@Model.Remarks" >
+							<span asp-validation-for="Remarks" class="text-danger"></span>
+						</div>
+					</div>
+				</div>
+
+				<button type="submit" class="btn btn-primary">Submit</button> &nbsp;
+				@*<button type="submit" asp-controller="BrokerSite" asp-action="Clear" class="btn btn-primary">Reset</button> &nbsp; *@
+				@*<a asp-controller="AgentMaster" asp-action="AgentMasters">
+					<button type="button" class="btn btn-primary">Back</button>
+				</a>*@
+				<button type="button" onclick="backButton()" class="btn btn-primary">Cancel</button>
+			</form>
+		</div>
+	}
+	else
+	{
+		
+		<div>
+
+			<form id="form1" asp-controller="AgentMaster" asp-action="Update" method="post" onsubmit="submmitForm(event)">
+				<input type="hidden" asp-for="AgentId" />
+				<input type="hidden" asp-for="Remarks" id="Remarks" name="Remarks" value="@Model.Remarks"/>
+				<input type="hidden" asp-for="AgentId" value="@Model.AgentId"  />
+				<input type="hidden" asp-for="BrokerId" value="@Model.BrokerId" />
+				<input type="hidden" asp-for="BrokerSiteId" value="@Model.BrokerSiteId" />
+				<input type="hidden" asp-for="SiteName" value="@Model.SiteName" id="SiteName" name="SiteName" />
+				@*<div class="form-group">
+			<label>Broker Id</label>
+			<input asp-for="BrokerId" class="form-control" id="BrokerId" name="BrokerId" value="@Model.BrokerId">
+			<span asp-validation-for="BrokerId" class="text-danger"></span>
+			</div>
+			<br />
+			<div class="form-group">
+			<label>Broker Site Id</label>
+			<input asp-for="BrokerSiteId" class="form-control" id="BrokerSiteId" name="BrokerSiteId" value="@Model.BrokerSiteId">
+			<span asp-validation-for="BrokerSiteId" class="text-danger"></span>
+			</div>
+			<br />*@
+
+				<div class="row">
+					<div class="col-lg-3 col-sm-12">
+						<div class="form-group">
+							<label>Agent Name</label>
+							<input  asp-for="AgentName" class="form-control" id="AgentName" name="AgentName" value="@Model.AgentName">
+							<span asp-validation-for="AgentName" class="text-danger"></span>
+						</div>
+					</div>
+					<div class="col-lg-3 col-sm-12">
+
+
+						<div class="form-group">
+							<label>InstanceIP</label>
+							<input asp-for="nvcInstanceIP" class="form-control" id="nvcInstanceIP" name="nvcInstanceIP" value="@Model.nvcInstanceIP">
+							<span asp-validation-for="nvcInstanceIP" class="text-danger"></span>
+						</div>
+					</div>
+				</div>
+
+				<button type="submit" class="btn btn-primary" >Update</button> &nbsp;
+				@*            <button type="submit" asp-controller="BrokerSite" asp-action="Clear" class="btn btn-primary">Reset</button> &nbsp;&nbsp;
+			*@            
+				<button type="button" onclick="backButton()" class="btn btn-primary">Cancel</button>
+			</form>
+		</div>
+	}
+	 
+</div>
+<script>
+	function process1() {
+
+		//alert(document.getElementById("ddlVendor").value);
+
+		//document.getElementById("Para").value = document.getElementById("ddlVendor").value;
+
+		//alert(document.getElementById("Para").value);
+		if (!confirm('Are you sure you want to save..?')) {
+			return false;
+		}
+		else {
+			document.getElementById("form1").submit();
+		}
+	}
+</script>
+<script>
+	function getConfirmationlocal() {
+
+		if (!confirm('Do you want to save the changes..?')) {
+			return false;
+		}
+		else {
+			document.getElementById("formsites").submit();
+		}
+	}
+	function backButton() {
+		$("#FormView").hide();
+	}
+</script>
+<script>
+	function submmitForm(e) {
+		debugger
+		e.preventDefault();
+		Swal.fire({
+			title: "Do you want to save the changes?",
+			showDenyButton: true,
+			showCancelButton: true,
+			confirmButtonText: "Save",
+			denyButtonText: `Don't save`
+		}).then((result) => {
+			debugger
+			/* Read more about isConfirmed, isDenied below */
+			if (result.isConfirmed) {
+
+				const myform = document.getElementById("form1");
+				var SiteName = document.getElementById("SiteName").value;
+				var AgentName = document.getElementById("AgentName").value;
+				var InstanceIP = document.getElementById("nvcInstanceIP").value;
+				var Remarks = document.getElementById("Remarks").value;
+				var flag = true;
+				var msg = "";
+				if (SiteName == "") {
+					flag = false;
+					msg = "SiteName can't be empty";
+				}
+				if (AgentName == "") {
+					flag = false;
+					msg = "AgentName can't be empty";
+				}
+				if (InstanceIP == "") {
+					flag = false;
+					msg = "InstanceIP can't be empty";
+				}
+				if (Remarks == "")
+				{
+					flag = false;
+					msg = "Remarks can't be empty"
+				}
+				if (flag == false) {
+					Swal.fire({
+						icon: "error",
+						title: "Oops...",
+						text: msg,
+					});
+				}
+				if (flag == true) {
+					Swal.fire({ 
+						icon: "success",
+						title: "Your work has been saved",
+						showConfirmButton: false,
+						timer: 1500
+					}).then(() => {
+						myform.submit();
+					});
+
+				}
+
+			} else if (result.isDenied) {
+				Swal.fire("Changes are not saved", "", "info");
+			}
+		});
+	}
+</script>
+
+
+@model List<LoginSignupCore.Models.AgentMaster>
+@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+<div style="padding-top:100px">
+    <div class="pagetitle">
+        <h1></h1>
+        <nav>
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="index.html">Home</a></li>
+                <li class="breadcrumb-item">Forms</li>
+                <li class="breadcrumb-item active">Layouts</li>
+            </ol>
+        </nav>
+    </div><!-- End Page Title -->
+    <section class="section">
+        <div class="row">
+            @if (Model != null)
+            {
+                @foreach (var agent in Model)
+                {
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">@agent.AgentName</h5>
+
+                                <a class="nav-link" asp-action="Index" asp-controller="BODProcess" asp-route-brokerid="@agent.BrokerId" asp-route-siteid="@agent.BrokerSiteId" asp-route-agentid="@agent.AgentId">
+                                    <button type="submit" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#basicModal">
+                                       View Agent 
+                                    </button>
+                                </a>
+
+                            </div>
+                        </div>
+                    </div>
+                }
+                
+               
+            }
+
+
+        </div>
+    </section>
+</div>
+
+
+using LoginSignupCore.Core;
+using LoginSignupCore.Global;
+using LoginSignupCore.MasterCache;
+using LoginSignupCore.Models;
+using System.Data.SqlClient;
+
+namespace LoginSignupCore.Data
+{
+    public class AgentRepository
+    {
+        public void InsertUpdateData(AgentMaster agentMaster)
+        {
+            using (var connection = new SqlConnection(Config.connectionString))
+            {
+                string query =
+                    "INSERT INTO AgentMaster (nvcAgentName,intBrokerId,intBrokerSiteId,nvcInstanceIP,nvcRemarks,dtmCreatedOn,intCreatedBy)" +
+                    "VALUES(@nvcAgentName,@intBrokerId,@intBrokerSiteId,@nvcInstanceIP,@nvcRemarks,@dtmCreatedOn,@intCreatedBy)" +
+                    "SELECT SCOPE_IDENTITY()";
+                using (var command = new SqlCommand(query,connection))
+                {
+                    command.Parameters.AddWithValue("@nvcAgentName", agentMaster.AgentName);
+                    command.Parameters.AddWithValue("@intBrokerId", agentMaster.BrokerId);
+                    command.Parameters.AddWithValue("@intBrokerSiteId", agentMaster.BrokerSiteId);
+                    command.Parameters.AddWithValue("@nvcInstanceIP", agentMaster.nvcInstanceIP);
+                    command.Parameters.AddWithValue("@nvcRemarks", agentMaster.Remarks);
+                    command.Parameters.AddWithValue("@dtmCreatedOn", agentMaster.DtmCreationDate);
+                    command.Parameters.AddWithValue("@intCreatedBy", agentMaster.IntCreatedBy);
+                    connection.Open();
+                    object id = command.ExecuteScalar();
+                    if(id != null)
+                    {
+                        _ = int.TryParse(id.ToString(), out int agentId);
+                        if(agentId != 0)
+                        {
+                            AgentSessionInfo agentSessionInfo = new();
+                            agentSessionInfo.AgentId = agentId;
+                            agentSessionInfo.BrokerId = agentMaster.BrokerId;
+                            agentSessionInfo.SiteId = agentMaster.BrokerSiteId;
+                            agentSessionInfo.IP = agentMaster.nvcInstanceIP;
+                            agentSessionInfo.AgentName = agentMaster.AgentName;
+
+                            CoreProcess.ipSessionCache.AddOrUpdate(agentSessionInfo);
+                            CoreProcess.agentSessionCache.AddOrUpdate(agentSessionInfo);
+                        }
+                    }
+                }
+
+            }
+        }
+        public List<AgentMaster> GetAllAgents(int brokerid, int siteid,int isdelete=0)
+        {
+            var agents = new List<AgentMaster>();
+            using (var connection = new SqlConnection(Config.connectionString))
+            {
+                string query = "SELECT intAgentId,nvcAgentName,intBrokerId,intBrokerSiteId,nvcInstanceIP,IsActive,IsDeleted,nvcRemarks,dtmCreatedOn,intCreatedBy,dtmUpdatedOn,intUpdatedBy " +
+                    "from AgentMaster where intBrokerId=@intBrokerId and intBrokerSiteId=@intBrokerSiteId and IsDeleted=@IsDeleted";
+                using (var command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@intBrokerId", brokerid);
+                    command.Parameters.AddWithValue("@intBrokerSiteId", siteid);
+                    command.Parameters.AddWithValue("@IsDeleted", isdelete);
+                    connection.Open();
+                    using (var reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            AgentMaster agent = new AgentMaster();
+                            agent.AgentId = reader.GetInt32(reader.GetOrdinal("intAgentId"));
+                            agent.AgentName = reader.GetString(reader.GetOrdinal("nvcAgentName"));
+                            agent.BrokerId = reader.GetInt32(reader.GetOrdinal("intBrokerId"));
+                            agent.BrokerSiteId = reader.GetInt32(reader.GetOrdinal("intBrokerSiteId"));
+                            agent.nvcInstanceIP = reader.GetString(reader.GetOrdinal("nvcInstanceIP"));
+                            agent.IsActive = Convert.ToInt32(reader.GetBoolean(reader.GetOrdinal("IsActive")));
+                            agent.IsDeleted = Convert.ToInt32(reader.GetBoolean(reader.GetOrdinal("IsDeleted")));
+                            agent.Remarks = reader.GetString(reader.GetOrdinal("nvcRemarks"));
+                            agent.DtmCreationDate = reader.GetDateTime(reader.GetOrdinal("dtmCreatedOn"));
+                            agent.DtmUpdationDate = (reader.IsDBNull(reader.GetOrdinal("dtmUpdatedOn")) ? DateTime.MinValue
+                                                       : reader.GetDateTime(reader.GetOrdinal("dtmUpdatedOn")));
+                            agent.IntCreatedBy = reader.GetInt32(reader.GetOrdinal("intCreatedBy"));
+                            agent.IntUpdatedBy = reader.IsDBNull(reader.GetOrdinal("intUpdatedBy")) ? -1 : reader.GetInt32(reader.GetOrdinal("intUpdatedBy"));
+                            agents.Add(agent);
+                        }
+                    }
+                }
+
+            }
+            return agents;
+        }
+        public AgentMaster GetAgentById(int agentID)
+        {
+            var agent = new AgentMaster();
+            using (var connection = new SqlConnection(Config.connectionString))
+            {
+                string query = "SELECT intAgentId,nvcAgentName,intBrokerId,intBrokerSiteId,nvcInstanceIP,IsActive,IsDeleted,nvcRemarks,dtmCreatedOn,intCreatedBy,dtmUpdatedOn,intUpdatedBy from AgentMaster where intAgentId=@intAgentId";
+                using (var command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@intAgentId", agentID);
+                    
+                    connection.Open();
+                    using (var reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+
+                            agent.AgentId = reader.GetInt32(reader.GetOrdinal("intAgentId"));
+                            agent.AgentName = reader.GetString(reader.GetOrdinal("nvcAgentName"));
+                            agent.BrokerId = reader.GetInt32(reader.GetOrdinal("intBrokerId"));
+                            agent.BrokerSiteId = reader.GetInt32(reader.GetOrdinal("intBrokerSiteId"));
+                            agent.nvcInstanceIP = reader.GetString(reader.GetOrdinal("nvcInstanceIP"));
+                            agent.IsActive = Convert.ToInt32(reader.GetBoolean(reader.GetOrdinal("IsActive")));
+                            agent.IsDeleted = Convert.ToInt32(reader.GetBoolean(reader.GetOrdinal("IsDeleted")));
+                            agent.Remarks = reader.GetString(reader.GetOrdinal("nvcRemarks"));
+                            agent.DtmCreationDate = reader.GetDateTime(reader.GetOrdinal("dtmCreatedOn"));
+                            agent.DtmUpdationDate = (reader.IsDBNull(reader.GetOrdinal("dtmUpdatedOn")) ? DateTime.MinValue
+                                                       : reader.GetDateTime(reader.GetOrdinal("dtmUpdatedOn")));
+                            agent.IntCreatedBy = reader.GetInt32(reader.GetOrdinal("intCreatedBy"));
+                            agent.IntUpdatedBy = reader.IsDBNull(reader.GetOrdinal("intUpdatedBy")) ? -1 : reader.GetInt32(reader.GetOrdinal("intUpdatedBy"));
+                           
+                        }
+                    }
+                }
+
+            }
+            return agent;
+        }
+        public int UpdateData(AgentMaster agentMaster)
+        {
+            using (var connection = new SqlConnection(Config.connectionString))
+            {
+                string query = "update AgentMaster set nvcAgentName=@nvcAgentName,nvcInstanceIP=@nvcInstanceIP," +
+                    "nvcRemarks=@nvcRemarks,dtmUpdatedOn=@dtmUpdatedOn,intUpdatedBy=@intUpdatedBy where intAgentId=@intAgentId";
+
+
+                using (var command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@intAgentId", agentMaster.AgentId);
+                    command.Parameters.AddWithValue("@nvcAgentName", agentMaster.AgentName);
+                    command.Parameters.AddWithValue("@nvcInstanceIP", agentMaster.nvcInstanceIP);
+                    command.Parameters.AddWithValue("@nvcRemarks", agentMaster.Remarks);
+                    command.Parameters.AddWithValue("@dtmUpdatedOn", agentMaster.DtmUpdationDate);
+                    command.Parameters.AddWithValue("@intUpdatedBy", agentMaster.IntUpdatedBy);
+                    connection.Open();
+                    int rowAffected = command.ExecuteNonQuery();
+                    return rowAffected;
+                }
+
+            }
+        }
+        public int DeleteData(AgentMaster agentMaster)
+        {
+            using (var connection = new SqlConnection(Config.connectionString))
+            {
+                string query = "update AgentMaster set IsDeleted=@IsDeleted,nvcRemarks=@nvcRemarks,dtmUpdatedOn=@dtmUpdatedOn,intUpdatedBy=@intUpdatedBy where intAgentId=@intAgentId";
+
+
+                using (var command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@intAgentId", agentMaster.AgentId);
+                    command.Parameters.AddWithValue("@IsDeleted", agentMaster.IsDeleted);
+                    command.Parameters.AddWithValue("@nvcRemarks", agentMaster.Remarks);
+                    command.Parameters.AddWithValue("@dtmUpdatedOn", agentMaster.DtmUpdationDate);
+                    command.Parameters.AddWithValue("@intUpdatedBy", agentMaster.IntUpdatedBy);
+                    connection.Open();
+                    int rowAffected = command.ExecuteNonQuery();
+                    return rowAffected;
+                }
+
+            }
+        }
+        public int UpdateIsActiveData(AgentMaster agentMaster)
+        {
+            using (var connection = new SqlConnection(Config.connectionString))
+            {
+                string query = "update AgentMaster set IsActive=@IsActive,nvcRemarks=@nvcRemarks,dtmUpdatedOn=@dtmUpdatedOn,intUpdatedBy=@intUpdatedBy where intAgentId=@intAgentId";
+
+
+                using (var command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@intAgentId", agentMaster.AgentId);
+                    command.Parameters.AddWithValue("@IsActive", agentMaster.IsActive);
+                    command.Parameters.AddWithValue("@nvcRemarks", agentMaster.Remarks);
+                    command.Parameters.AddWithValue("@dtmUpdatedOn", agentMaster.DtmUpdationDate);
+                    command.Parameters.AddWithValue("@intUpdatedBy", agentMaster.IntUpdatedBy);
+                    connection.Open();
+                    int rowAffected = command.ExecuteNonQuery();
+                    return rowAffected;
+                }
+
+            }
+        }
+    }
+}
