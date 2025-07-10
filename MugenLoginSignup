@@ -1,3 +1,2080 @@
+using CTCL.BinaryProtocol.Common.CMA.Enum;
+using Exchange.WebSocketServer.SocketManager;
+using LoginSignupCore.Global;
+using LoginSignupCore.Models;
+using LoginSignupCore.Models.Others;
+using LoginSignupCore.Models.Request;
+using LoginSignupCore.Models.Response;
+using Newtonsoft.Json;
+using Utility.Queueing;
+
+namespace LoginSignupCore.Core
+{
+    public class InteractiveProcessQueue
+    {
+        private ProcessQueue<DataFlowModel> interactiveMessageQueue;
+        Thread thread;
+        ManualResetEvent _mre;
+        public InteractiveProcessQueue()
+        {
+            interactiveMessageQueue = new ProcessQueue<DataFlowModel>();
+            _mre = new ManualResetEvent(false);
+            DrainerThreadInit();
+        }
+
+        public void Enqueue(DataFlowModel message)
+        {
+            interactiveMessageQueue.Enqueue(message);
+        }
+        private void DrainerThreadInit()
+        {
+            thread = new Thread(new ThreadStart(DrainMessage));
+            thread.Start();
+        }
+        private void DrainMessage()
+        {
+            while (true)
+            {
+                if (interactiveMessageQueue.TryDequeue(out DataFlowModel message))
+                {
+                    try
+                    {
+                        //Process message
+                        ProcessMessage(message);
+                    }
+                    catch (System.Exception ex)
+                    {
+                        Log.Error(message, $"Exception occured on message process {ex.Message}");
+                    }
+                }
+            }
+        }
+        private void ProcessMessage(DataFlowModel message)
+        {
+            try
+            {
+                if (message.Data != null)
+                {
+                    string reqData = message.Data.ToString();
+                    var baseResponse = JsonConvert.DeserializeObject<MsgHeader>(reqData);
+                    if (baseResponse != null)
+                    {
+                        var opcode = (CMA_OpCode)baseResponse.MessageCode;
+                        switch (opcode)
+                        {
+                            case CMA_OpCode.AGENT_HANDSHAKE_REQ:
+                                {
+                                    Log.Info($"Received AGENT_HANDSHAKE_REQ");
+                                    var agentHandshakeReq = JsonConvert.DeserializeObject<AgentHandshakeReq>(reqData);
+                                    if (agentHandshakeReq != null)
+                                    {
+                                        var data = CoreProcess.ipSessionCache.Get(agentHandshakeReq.IP);
+
+                                        //update socket session in sgent wise cache
+
+                                        if (data.Item1)
+                                        {
+                                            data.Item2.Session = message.Token;
+                                            AgentSessionWs agentSessionWs = new()
+                                            {
+                                                AgentId = data.Item2.AgentId,
+                                                BrokerId = data.Item2.BrokerId,
+                                                SiteId = data.Item2.SiteId,
+                                            };
+                                            CoreProcess.webSocketIdWiseSession.AddOrUpdate(new WebSocketSessionToken() { webSocketSessionToken = message.Token.Context.Channel.Id.AsShortText() }, agentSessionWs);
+                                            CoreProcess.agentSessionCache.AddOrUpdate(data.Item2);
+                                            MsgHeader res = new()
+                                            {
+                                                MessageCode = (int)CMA_OpCode.AGENT_HANDSHAKE_RES,
+                                                AgentId = data.Item2.AgentId,
+                                                BrokerId = data.Item2.BrokerId,
+                                                SiteId = data.Item2.SiteId
+                                            };
+                                            CoreProcess.socketManager.Enqueue(new() { Token = message.Token, Data = res });
+                                        }
+                                        else
+                                        {
+                                            Log.Error($"Data not found | {agentHandshakeReq.IP} not found");
+                                        }
+                                    }
+                                    else
+                                    {
+                                        Log.Error($"Error while procesing AGENT_HANDSHAKE_REQ");
+                                    }
+                                }
+                                break;
+
+                            case CMA_OpCode.LOGIN_REQ:
+                                {
+                                    Log.Info($"Received LoginRequest");
+                                    var loginReq = JsonConvert.DeserializeObject<LoginRequest>(reqData);
+                                    if (loginReq != null)
+                                    {
+
+                                    }
+                                    else
+                                    {
+                                        Log.Error($"Error while procesing LoginRequest");
+                                    }
+                                }
+                                break;
+
+                            case CMA_OpCode.COMPONENT_INFO_REQ:
+                                {
+                                    Log.Info($"Received COMPONENT_INFO_REQ");
+                                    var compInfoReq = JsonConvert.DeserializeObject<MsgHeader>(reqData);
+                                    if (compInfoReq != null)
+                                    {
+                                        var compList = CoreProcess.agentSessionCache.GetComponentMaster(compInfoReq.BrokerId, compInfoReq.SiteId, compInfoReq.AgentId);
+                                        if (compList.Item1)
+                                        {
+                                            var responseData = Helper.PrepareComponentInfoResponse(compList.Item2);
+                                            responseData.MessageCode = (int)CMA_OpCode.COMPONENT_INFO_RES;
+                                            CoreProcess.socketManager.Enqueue(new() { Token = message.Token, Data = responseData });
+                                        }
+                                        else
+                                        {
+                                            Log.Error($"Error while fetching Compoent Master Data");
+                                        }
+                                    }
+                                    else
+                                    {
+                                        Log.Error($"Error while procesing COMPONENT_INFO_REQ");
+                                    }
+                                }
+                                break;
+
+                            case CMA_OpCode.FILE_INFO_REQ:
+                                {
+                                    Log.Info($"Received FILE_INFO_REQ");
+                                    var fileInfoReq = JsonConvert.DeserializeObject<MsgHeader>(reqData);
+                                    if (fileInfoReq != null)
+                                    {
+                                        var fileList = CoreProcess.agentSessionCache.GetFileMasterInfo(fileInfoReq.BrokerId, fileInfoReq.SiteId, fileInfoReq.AgentId);
+                                        if (fileList.Item1)
+                                        {
+                                            var responseData = Helper.PrepareFileInfoResponse(fileList.Item2);
+                                            var masterPath = CoreProcess.agentSessionCache.GetMasterPath(fileInfoReq.BrokerId, fileInfoReq.SiteId);
+                                            responseData.MessageCode = (int)CMA_OpCode.FILE_INFO_RES;
+                                            if (masterPath.Item1 && masterPath.Item2 != null)
+                                            {
+                                                responseData.MasterPath = masterPath.Item2;
+                                            }
+                                            CoreProcess.socketManager.Enqueue(new() { Token = message.Token, Data = responseData });
+                                        }
+                                        else
+                                        {
+                                            Log.Error($"Error while fetching FILE_INFO_REQ Data");
+                                        }
+                                    }
+                                    else
+                                    {
+                                        Log.Error($"Error while procesing FILE_INFO_REQ");
+                                    }
+                                }
+                                break;
+
+                            case CMA_OpCode.FILE_UPLOAD_CONFIRMATION:
+                                {
+                                    Log.Info($"Received FILE_UPLOAD_CONFIRMATION");
+                                    var fileStatus = JsonConvert.DeserializeObject<FileStatus>(reqData);
+                                    if (fileStatus != null)
+                                    {
+                                        CoreProcess.agentSessionCache.AddOrUpdate(fileStatus);
+                                        CoreProcess.dBProcessor.Enqueue(reqData);
+                                    }
+                                    else
+                                    {
+                                        Log.Error($"Error while procesing FILE_UPLOAD_CONFIRMATION");
+                                    }
+                                }
+                                break;
+
+                            case CMA_OpCode.COMPONENT_STATE_UPDATE:
+                                {
+                                    Log.Info($"Received COMPONENT_STATE_UPDATE");
+                                    var compStatus = JsonConvert.DeserializeObject<ComponentStatus>(reqData);
+                                    if (compStatus != null)
+                                    {
+                                        CoreProcess.agentSessionCache.AddOrUpdate(compStatus);
+                                        CoreProcess.dBProcessor.Enqueue(reqData);
+                                    }
+                                    else
+                                    {
+                                        Log.Error($"Error while procesing COMPONENT_STATE_UPDATE");
+                                    }
+                                }
+                                break;
+
+                            case CMA_OpCode.CMA_TECHNICAL_PARAM_REQ:
+                                {
+                                    Log.Info($"Received CMA_TECHNICAL_PARAM_REQ");
+                                    var techInfo = JsonConvert.DeserializeObject<ComponentTechincalInfo>(reqData);
+                                    if (techInfo != null)
+                                    {
+                                        var info = Helper.PrepareTechnicalParamModel(techInfo);
+                                        if (info.InstanceId != 0)
+                                        {
+                                            CoreProcess.agentSessionCache.AddOrUpdate(info);
+                                        }
+                                        CoreProcess.dBProcessor.Enqueue(reqData);
+                                    }
+                                    else
+                                    {
+
+                                        Log.Error($"Error while procesing CMA_TECHNICAL_PARAM_REQ");
+                                    }
+                                }
+                                break;
+
+                            case CMA_OpCode.END_MSG_DOWNLOAD:
+                                {
+                                    Log.Info($"Received END_MSG_DOWNLOAD");
+                                    var session = CoreProcess.agentSessionCache.GetSession(baseResponse.BrokerId, baseResponse.SiteId, baseResponse.AgentId);
+                                    if (session.Item1 && session.Item2 != null)
+                                    {
+                                        session.Item2.IsConnected = true;
+                                    }
+                                }
+                                break;
+
+                            default:
+                                break;
+                        }
+                    }
+                }
+            }
+            catch(Exception ex)
+            {
+                Log.Error($"Error occured during ProcessMessage");
+            }
+        }
+    }
+    public class DataFlowModel
+    {
+        public SocketSession Token;
+        public object Data;
+    }
+}
+
+
+using BinaryProtocol.Common;
+using Exchange.Logs;
+using LoginSignupCore.Global;
+using LoginSignupCore.MasterCache;
+using LoginSignupCore.Processor;
+using Serilog;
+using Serilog.Core;
+using Serilog.Events;
+
+namespace LoginSignupCore.Core
+{
+    public class CoreProcess
+    {
+        public static Response response;
+        private static LogProcessor logProcessor;
+        public static WebSocketIdWiseSession webSocketIdWiseSession;
+        public static SocketManager socketManager;
+        public static AgentSessionCache agentSessionCache;
+        public static IPSessionCache ipSessionCache;
+        public static DBProcessor dBProcessor;
+
+        public static async Task<Response> Initialize()
+        {
+            response = new();
+
+            LogConfiguration logConfiguration = new LogConfiguration
+            {
+                FilesizeLimitBytes = 50000000,
+                LogFileNameWithPath = Config.logfile,
+                LoggingLevelSwitch = new LoggingLevelSwitch
+                {
+                    MinimumLevel = Config.logLevel == 0 ? LogEventLevel.Debug : (LogEventLevel)Config.logLevel,
+                },
+                OutputTemplate = "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u5}] {Message:lj}{NewLine}{Exception}",
+                RetainedFileCount = Config.logFileCount,
+                RollingInterval = RollingInterval.Day,
+                RollOnFileSizeLimit = true,
+            };
+
+            LogType logType = (LogType)Config.logLevel;
+
+            if (logProcessor == null)
+            {
+                logProcessor = new LogProcessor(logConfiguration);
+            }
+
+            dBProcessor = new();
+            ipSessionCache = new();
+            agentSessionCache = new();
+            webSocketIdWiseSession = new();
+            socketManager = new();
+            CacheOnLoad.LoadAllCacheData();
+            await socketManager.Initialize();               
+            return new Response()
+            {
+                Message = ""
+            };
+        }
+
+        public static Response SendToLogQueue(LogObject data)
+        {
+            if (!data.Equals(default(LogObject)) && logProcessor != null)
+            {
+                return logProcessor.Enqueue(data);
+            }
+            else if (logProcessor == null)
+            {
+                return response.Set(StatusCode.OMS_Failure, "logProcessor is null");
+            }
+            else
+            {
+                return response.Set(StatusCode.OMS_Failure, "data is null");
+            }
+        }
+    }
+}
+
+
+using System.Runtime.InteropServices;
+
+namespace LoginSignupCore.Core
+{
+    public class exitHook
+    {
+        private const int MF_BYCOMMAND = 0x00000000;
+        public const int SC_CLOSE = 0xF060;
+
+        [DllImport("user32.dll")]
+        public static extern int DeleteMenu(IntPtr hMenu, int nPosition, int wFlags);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetSystemMenu(IntPtr hWnd, bool bRevert);
+
+        [DllImport("kernel32.dll", ExactSpelling = true)]
+        private static extern IntPtr GetConsoleWindow();
+
+        static exitHook()
+        {
+            DeleteMenu(GetSystemMenu(GetConsoleWindow(), false), SC_CLOSE, MF_BYCOMMAND);
+        }
+
+        public static void exitHookInit()
+        {
+            string strExit, strExitconfirm;
+
+            Console.CancelKeyPress += Console_CancelKeyPress;
+            Console.WriteLine("running");
+
+
+        }
+
+        private static void Console_CancelKeyPress(object? sender, ConsoleCancelEventArgs args)
+        {
+            args.Cancel = true;
+            //ask();
+
+        }
+
+        public static void ask()
+        {
+            Console.WriteLine("Type exit and press Enter to Close the Programm ");
+        }
+    }
+}
+
+
+using BinaryProtocol.Common;
+using CTCL.BinaryProtocol.Common.CMA.Enum;
+using LoginSignupCore.Global;
+using LoginSignupCore.MasterCache;
+using LoginSignupCore.Models.Request;
+using LoginSignupCore.Models.Response;
+using Newtonsoft.Json;
+using Utility;
+using ComponentInfo = LoginSignupCore.Models.Response.ComponentInfo;
+using FileInfo = LoginSignupCore.Models.Response.FileInfo;
+
+
+namespace LoginSignupCore.Core
+{
+    public class Helper
+    {
+        private static Conversion conversion;
+
+        static Helper()
+        {
+            conversion = new();
+        }
+
+        public static string SerializeObject(object obj)
+        {
+            try
+            {
+                return JsonConvert.SerializeObject(obj);
+            }
+            catch (Exception ex)
+            {
+                return "Error in serialize :" + ex.Message;
+            }
+
+        }
+
+		public static ComponentInfo PrepareComponentInfoResponse(List<Component> compList)
+		{
+			ComponentInfo componentInfo = new();
+			if (compList != null)
+			{
+				componentInfo.Data = new();
+				for (int i = 0; i < compList.Count; i++)
+				{
+					ComponentInfoData componentInfoData = new();
+					componentInfoData.ComponentType = compList[i].componentMaster.ComponentId;
+					componentInfoData.InstanceId = compList[i].componentMaster.InstanceId;
+					componentInfoData.CmdParameters = compList[i].componentMaster.CmdParam;
+					componentInfoData.ExecutablePath = compList[i].componentMaster.ExePath;
+					componentInfoData.Priority = compList[i].componentMaster.Priority;
+					componentInfoData.ServiceName = compList[i].componentMaster.ServiceName;
+
+					componentInfo.Data.Add(componentInfoData);
+				}
+			}
+			return componentInfo;
+		}
+		public static FileInfo PrepareFileInfoResponse(List<FileMasterInfo> fileList)
+		{
+			FileInfo fileInfo = new();
+			if (fileList != null)
+			{
+				fileInfo.Files = new();
+				for (int i = 0; i < fileList.Count; i++)
+				{
+					FilePathInfo filePathInfo = new();
+					filePathInfo.FileName = fileList[i].FileName;
+					filePathInfo.FilePriority = fileList[i].Priority;
+					filePathInfo.Segment = fileList[i].SegmentId;
+					filePathInfo.FileType = fileList[i].FileType;
+					filePathInfo.IsUploadBeforeBod = fileList[i].IsUploadBeforeBOD;
+					filePathInfo.DestinationPath = fileList[i].DestinationPath;
+
+                    fileInfo.Files.Add(filePathInfo);
+                }
+            }
+            return fileInfo;
+        }
+        public static ComponentInitReq PrepareComponentInitReq(ComponentMaster componentMaster, CMA_OpCode opCode)
+        {
+            ComponentInitReq componentInitReq = new()
+            {
+                AgentId = componentMaster.AgentId,
+                BrokerId = componentMaster.BrokerId,
+                SiteId = componentMaster.SiteId,
+                MessageCode = (int)opCode,
+                ComponentType = componentMaster.ComponentId,
+                InstanceId = componentMaster.InstanceId,
+                IsRunAsService = componentMaster.IsRunAsService,
+                RequestId = GenerateRequestId(componentMaster.ComponentId, componentMaster.InstanceId, componentMaster.AgentId)
+            };
+            return componentInitReq;
+        }
+        public static ComponentsTechnicalInfo PrepareTechnicalParamModel(ComponentTechincalInfo technicalInfo)
+        {
+            ComponentsTechnicalInfo componentsTechnicalInfo = new()
+            {
+                BrokerId = technicalInfo.BrokerId,
+                SiteId = technicalInfo.SiteId,
+                AgentId = technicalInfo.AgentId,
+                ComponentId = technicalInfo.ComponentType,
+                InstanceId = technicalInfo.InstanceId,
+                CPUUtilization = technicalInfo.CPUPercentage,
+                RAMUtilization = technicalInfo.RAMUsage,
+                ComponentName = ((ComponentType)technicalInfo.ComponentType).ToString(),
+                AgentName =  CoreProcess.agentSessionCache.GetSession(technicalInfo.BrokerId, technicalInfo.SiteId,technicalInfo.AgentId).Item2?.AgentName??string.Empty,
+                Timestamp = DateTime.Now.ToString("dd/MM/yyyyTHH:mm:ss")
+
+            };
+            return componentsTechnicalInfo;
+        }
+        public static string GenerateRequestId(int compId, int instanceId, int agentInstanceId)
+        {
+            int agentCompId = (int)ComponentType.AgentWorker;
+            //Length 2
+            string agentId = agentCompId.ToString("D2");
+            //Length 4
+            string agentInstId = agentInstanceId.ToString("D4");
+            //Length 2
+            string destCompId = compId.ToString("D2");
+            //Length 2
+            string destInsId = "";
+            if (instanceId < 0)
+            {
+                destInsId = "01";
+            }
+            else
+            {
+                destInsId = instanceId.ToString("D2");
+            }
+            //Length 4
+            string year = DateTime.Now.Year.ToString("D4");
+            //Length 2
+            string month = DateTime.Now.Month.ToString("D2");
+            //Length 2
+            string date = DateTime.Now.Day.ToString("D2");
+            //Length 14
+            string id = (++Config.Id).ToString("D14");
+
+            string requestId = string.Concat(agentId, agentInstId, destCompId, destInsId, year, month, date, id);
+            if (requestId.Length == 32)
+                return requestId;
+            return DateTime.Now.Ticks.ToString("D32");
+        }
+    }
+}
+
+
+using BinaryProtocol.Common;
+using SocketSession = Exchange.WebSocketServer.SocketManager.SocketSession;
+using LoginSignupCore.Global;
+using Exchange.WebSocketServer.SocketManager;
+using WebSocketSessionToken = Exchange.WebSocketServer.SocketManager.WebSocketSessionToken;
+using Utility.Queueing;
+using LoginSignupCore.Models;
+
+namespace LoginSignupCore.Core
+{
+    public class SocketManager
+    {
+        private ProcessQueue<DataFlowModel> queue;
+        private Thread thread;
+        private InteractiveProcessQueue _interactiveProcessQueue;
+        public async Task Initialize()
+        {
+            queue = new();
+            thread = new Thread(new ThreadStart(ListenQueue));
+            thread.Start();
+            _interactiveProcessQueue = new InteractiveProcessQueue();
+            WebsocketManager.OnOpenConnection += WebsocketManager_OnOpenConnection;
+            WebsocketManager.OnStringMessageReceived += WebsocketManager_OnMessageReceived;
+            WebsocketManager.OnErrorListener += WebsocketManager_OnErrorListener;
+            WebsocketManager.OnCloseConnection += WebsocketManager_OnCloseConnection;
+
+            await Exchange.WebSocketServer.Global.Startup.Setup();
+        }
+
+        private void WebsocketManager_OnOpenConnection(SocketSession socketSession)
+        {
+            Log.Info($"On Ws open con-> {socketSession.Context.Channel.Id.AsShortText()}");
+            //UserSession userSession = new UserSession
+            //{
+            //    SocketSession = socketSession,
+            //    WebSocketSessionToken = new WebSocketSessionToken() { webSocketSessionToken = socketSession.Context.Channel.Id.AsShortText() }
+            //};
+            //CoreProcess.webSocketIdWiseSession.AddOrUpdateWebSocketToken(userSession);
+        }
+        private void WebsocketManager_OnMessageReceived(SocketSession socketSession, object receivedmsg)
+        {
+            _interactiveProcessQueue.Enqueue(new() { Token = socketSession, Data = receivedmsg});
+        }
+        private static void WebsocketManager_OnErrorListener(SocketSession socketSession, Exception ex)
+        {
+            Log.Error(ex);
+        }
+        public static void WebsocketManager_OnCloseConnection(SocketSession socketSession)
+        {
+            if(socketSession != null && socketSession.Context != null && socketSession.Context.Channel != null)
+            {
+                WebSocketSessionToken webSocketSessionToken = new WebSocketSessionToken() { webSocketSessionToken = socketSession.Context.Channel.Id.AsShortText() };
+                CoreProcess.webSocketIdWiseSession.Remove(webSocketSessionToken);
+                Log.Info("Ws Close Evt: " + socketSession.Context.Channel.Id.AsShortText());
+            }
+        }
+        public static void Send(SocketSession socketSession, object data)
+        {
+            if(socketSession!=null)
+                WebsocketManager.Send(socketSession, data);
+        }
+        public void Enqueue(DataFlowModel data)
+        {
+            queue.Enqueue(data);
+        }
+        private void ListenQueue()
+        {
+            while (true)
+            {
+                if (queue.TryDequeue(out DataFlowModel res))
+                {
+                    Send(res.Token, res.Data);
+                }
+            }
+        }
+    }
+}
+
+
+using AgentWorker.Global;
+using AgentWorker.Models.Others;
+using AgentWorker.Models.Request;
+using AgentWorker.Models.Response;
+using BinaryProtocol.Common;
+using CTCL.BinaryProtocol.Common.CMA.Enum;
+using Newtonsoft.Json;
+using Utility.Queueing;
+using ComponentInfo = AgentWorker.Models.Response.ComponentInfo;
+using FileInfoModel = AgentWorker.Models.Response.FileInfo;
+
+namespace AgentWorker.Core
+{
+	public class InteractiveProcessQueue
+	{
+		private ProcessQueue<string> interactiveMessageQueue;
+		Thread thread;
+		ManualResetEvent _mre;
+		ManualResetEvent _uploadWait;
+		ManualResetEvent _componentWait;
+
+		public InteractiveProcessQueue()
+		{
+			interactiveMessageQueue = new ProcessQueue<string>();
+			_mre = new ManualResetEvent(false);
+			_uploadWait = new ManualResetEvent(false);
+			_componentWait = new ManualResetEvent(false);
+			DrainerThreadInit();
+		}
+
+		public void Enqueue(string message)
+		{
+			interactiveMessageQueue.Enqueue(message);
+		}
+		private void DrainerThreadInit()
+		{
+			thread = new Thread(new ThreadStart(DrainMessage));
+			thread.Start();
+		}
+		private void DrainMessage()
+		{
+			while (true)
+			{
+				if (interactiveMessageQueue.TryDequeue(out string message))
+				{
+					try
+					{
+						//Process message
+						ProcessMessage(message);
+					}
+					catch (System.Exception ex)
+					{
+						Log.Error(message, $"Exception occured on message process {ex.Message}");
+
+					}
+				}
+			}
+		}
+		private void ProcessMessage(string message)
+		{
+			var baseResponse = JsonConvert.DeserializeObject<MsgHeader>(message);
+			if(baseResponse != null) 
+			{
+				var opcode = (CMA_OpCode)baseResponse.MessageCode;
+				switch(opcode)
+                {
+                    case CMA_OpCode.AGENT_HANDSHAKE_RES:
+                        {
+                            Log.Info($"Received AGENT_HANDSHAKE_RES");
+                            var handshakeRes = JsonConvert.DeserializeObject<MsgHeader>(message);
+                            if (handshakeRes != null)
+                            {
+								Config.AgentWorkerId = handshakeRes.AgentId;
+								Config.BrokerId = handshakeRes.BrokerId;
+								Config.SiteId = handshakeRes.SiteId;
+
+								//starting current server cpu and ram utilization
+								//CoreProcess.SendTechnicalDataOfServer();
+
+                                //send Login Req
+                                //var loginReq = PrepareLoginReq();
+                                //CoreProcess.wsClientManager.Enqueue(loginReq);
+
+                                MsgHeader fileInfoReq = new() 
+								{
+									MessageCode = (int)CMA_OpCode.FILE_INFO_REQ,
+                                    AgentId = Config.AgentWorkerId,
+                                    BrokerId = Config.BrokerId,
+                                    SiteId = Config.SiteId,
+                                };
+                                CoreProcess.wsClientManager.Enqueue(fileInfoReq);
+                            }
+							else
+							{
+								Log.Error($"Error while procesing AGENT_HANDSHAKE_RES");
+							}
+                        }
+                        break;
+
+                    case CMA_OpCode.LOGIN_RESPONSE:
+						{
+							Log.Info($"Received Login Response");
+							var loginResponse = JsonConvert.DeserializeObject<StatusMessage>(message);
+							if(loginResponse != null && loginResponse.IsSucessStatus)
+							{
+								MsgHeader fileInfoReq = new()
+								{
+									MessageCode = (int)CMA_OpCode.FILE_INFO_REQ,
+									AgentId = Config.AgentWorkerId,	
+									BrokerId = Config.BrokerId,	
+									SiteId = Config.SiteId,	
+								};
+								CoreProcess.wsClientManager.Enqueue(fileInfoReq);
+                            }
+                            else
+                            {
+                                Log.Error($"Error while procesing LOGIN_RESPONSE");
+                            }
+                        }
+						break;
+
+                    case CMA_OpCode.FILE_INFO_RES:
+                        {
+                            Log.Info($"Received FILE_INFO_RES");
+                            var fileInfoResponse = JsonConvert.DeserializeObject<FileInfoModel>(message);
+                            if (fileInfoResponse != null)
+                            {
+								Config.MasterPath = fileInfoResponse.MasterPath;
+								CoreProcess.filePathInfo = fileInfoResponse.Files;
+
+								//Prepare ComponentInfo Download Req
+								MsgHeader compInfoHeader = new() 
+								{
+									MessageCode = (int)CMA_OpCode.COMPONENT_INFO_REQ,
+                                    AgentId = Config.AgentWorkerId,
+                                    BrokerId = Config.BrokerId,
+                                    SiteId = Config.SiteId,
+                                };
+                                CoreProcess.wsClientManager.Enqueue(compInfoHeader);
+                            }
+                            else
+                            {
+                                Log.Error($"Error while procesing FILE_INFO_RES");
+                            }
+                        }
+                        break;
+
+                    case CMA_OpCode.COMPONENT_INFO_RES:
+                        {
+                            Log.Info($"Received COMPONENT_INFO_RES");
+                            var componentInfoResponse = JsonConvert.DeserializeObject<ComponentInfo>(message);
+                            if (componentInfoResponse != null && componentInfoResponse.Data != null)
+                            {
+								for(int i=0; i<componentInfoResponse.Data.Count; i++)
+								{
+									CoreProcess.compDataCache.AddOrUpdate(componentInfoResponse.Data[i]);
+									if (!CoreProcess.componentManager.TryGetValue(((ComponentType)componentInfoResponse.Data[i].ComponentType, componentInfoResponse.Data[i].InstanceId), out var componentManager)) 
+									{
+										componentManager = new(componentInfoResponse.Data[i]);
+										CoreProcess.componentManager.Add(((ComponentType)componentInfoResponse.Data[i].ComponentType, componentInfoResponse.Data[i].InstanceId), componentManager);
+										if(componentInfoResponse.Data[i].ComponentType!=-1)
+										{
+                                            CoreProcess.interfaceProcessor.InitNew(componentInfoResponse.Data[i].ComponentType, componentInfoResponse.Data[i].InstanceId);
+                                            CoreProcess.SetExistingProcess((ComponentType)componentInfoResponse.Data[i].ComponentType, componentInfoResponse.Data[i].InstanceId);
+                                        }
+
+                                    }
+                                }
+                                //Prepare END MSG DOWNLOAD
+                                MsgHeader endMsg = new()
+                                {
+                                    MessageCode = (int)CMA_OpCode.END_MSG_DOWNLOAD,
+                                    AgentId = Config.AgentWorkerId,
+                                    BrokerId = Config.BrokerId,
+                                    SiteId = Config.SiteId,
+                                };
+                                CoreProcess.wsClientManager.Enqueue(endMsg);
+                            }
+                            else
+                            {
+                                Log.Error($"Error while procesing COMPONENT_INFO_RES");
+                            }
+                        }
+                        break;
+
+                    case CMA_OpCode.START_FILE_UPLOAD:
+                        {
+							if (!Config.isFileBODDoneToday)
+							{
+								Log.Info($"Received START_FILE_UPLOAD");
+                                var fileUpload = JsonConvert.DeserializeObject<FileUploadReq>(message);
+								if(fileUpload != null )
+                                {
+                                    CoreProcess.StartComponent(ComponentType.CONTRACT_MASTER_READER, -1, false, fileUpload.RequestId);
+                                    while (true)
+                                    {
+                                        _uploadWait.WaitOne(5000);
+                                        if (CoreProcess.GetIsRunning(ComponentType.CONTRACT_MASTER_READER, -1))
+                                        {
+                                            break;
+                                        }
+                                    }
+                                    ProcessFileUpload();
+                                }
+							}
+							else
+							{
+								bool status = false;
+								var messages = "All mandatory files is already uploaded";
+								SendEndFileUploadRes(status, messages);
+							}
+                            
+                        }
+                        break;
+
+                    case CMA_OpCode.COMPONENT_START:
+                        {
+                            Log.Info($"Received COMPONENT_START");
+                            var componentInitResponse = JsonConvert.DeserializeObject<ComponentInitReq>(message);
+							if(componentInitResponse != null)
+							{
+								var startResp = CoreProcess.StartComponent((ComponentType)componentInitResponse.ComponentType, componentInitResponse.InstanceId, componentInitResponse.IsRunAsService, componentInitResponse.RequestId);
+								if (startResp.StatusCode == StatusCode.Success)
+									Log.Info(startResp.Message);
+								else
+									Log.Error(startResp.Message);
+							}
+                        }
+						break;
+
+					case CMA_OpCode.COMPONENT_STOP:
+						Log.Info($"Received COMPONENT_STOP");
+						var componentInitEndResponse = JsonConvert.DeserializeObject<ComponentInitReq>(message);
+						if (componentInitEndResponse != null)
+						{
+							var startResp = CoreProcess.StopComponent((ComponentType)componentInitEndResponse.ComponentType, componentInitEndResponse.InstanceId);
+							if (startResp.StatusCode == StatusCode.Success)
+								Log.Info(startResp.Message);
+							else
+								Log.Error(startResp.Message);
+						}
+						break;
+
+                    case CMA_OpCode.START_AFTER_BOD_FILE_UPLOAD:
+                        {
+                            Log.Info($"Received START_AFTER_BOD_FILE_UPLOAD");
+                            var fileUpload = JsonConvert.DeserializeObject<FileUploadReq>(message);
+                            if (fileUpload != null)
+                            {
+                                ProcessAfterBODFileUpload();
+                            }
+
+                        }
+                        break;
+                    default:
+						break;
+				}
+			}
+		}
+		private void ProcessFileUpload()
+		{
+			//perform file upload here
+			string message = string.Empty;
+			bool status;
+			var list = CoreProcess.filePathInfo.OrderBy(x => x.FilePriority).ToList();
+			if(list != null)
+			{
+				for(int i=0; i<list.Count; i++) 
+				{
+					var segmentId = list[i].Segment;
+					var fileType = list[i].FileType;
+					var sourcePath = Config.MasterPath + "/" + list[i].FileName;
+
+					//var res = CoreProcess.fileDataCache.Get(segmentId, fileType);
+					if(/*res.Item1 && */list[i].IsUploadBeforeBod)
+					{
+						//var destinationPath = res.Item2.FilePath + "/" + list[i].FileName;
+						var destinationPath = list[i].DestinationPath + "/" + list[i].FileName;
+						var resp = CoreProcess.CopyFileData(sourcePath, destinationPath);
+						if(resp.StatusCode == StatusCode.Success)
+						{
+							SendFileUploadStatus(list[i], true, resp.Message);
+							Log.Info(resp.Message);
+						}
+						else
+						{
+							SendFileUploadStatus(list[i], false, resp.Message);
+							Log.Error(resp.Message);
+						}
+
+						while (true)
+						{
+							_uploadWait.WaitOne(5000);
+							if (list[i].IsFileUploadAck)
+							{
+								break;
+							}
+						}
+					}
+                    Thread.Sleep(3000);
+                }
+				message = "All mandatory file before bod process uploaded";
+				status = true;
+				Config.isFileBODDoneToday = true;
+			}
+			else
+			{
+				message = "no file found to upload";
+				status = false;
+			}
+			SendEndFileUploadRes(status, message);
+		}
+		private void SendFileUploadStatus(FilePathInfo filePathInfo, bool status, string message)
+		{
+			FileStatus fileStatus = new()
+			{
+				MessageCode = (int)CMA_OpCode.FILE_UPLOAD_CONFIRMATION,
+				BrokerId = Config.BrokerId,
+				SiteId = Config.SiteId,
+				AgentId = Config.AgentWorkerId,
+				FileName = filePathInfo.FileName,
+				FileType = filePathInfo.FileType,
+				Segment = filePathInfo.Segment,
+				IsSucessStatus = status,
+				Message = message,
+				TimeStamp = DateTime.Now
+			};
+			CoreProcess.wsClientManager.Enqueue(fileStatus);
+		}
+        private LoginRequest PrepareLoginReq()
+        {
+            LoginRequest request = new()
+            {
+                MessageCode = (int)CMA_OpCode.LOGIN_REQ,
+                SiteId = Config.SiteId,
+                AgentId = Config.AgentWorkerId,
+                BrokerId = Config.BrokerId
+            };
+            return request;
+        }
+		private void SendEndFileUploadRes(bool status, string message)
+		{
+			//send appropriate status to FE
+			StatusMessage statusMessage = new ();
+			statusMessage.MessageCode = (int)CMA_OpCode.END_FILE_UPLOAD;
+			statusMessage.SiteId = Config.SiteId;
+			statusMessage.AgentId = Config.AgentWorkerId;
+			statusMessage.BrokerId = Config.BrokerId;
+			statusMessage.IsSucessStatus = status;
+			statusMessage.Message = message;	
+			CoreProcess.wsClientManager.Enqueue(statusMessage);
+		}
+		private void ProcessAfterBODFileUpload()
+		{
+            var list = CoreProcess.filePathInfo.Where(y => y.IsUploadBeforeBod == false).OrderBy(x => x.FilePriority).ToList();
+            if (list != null)
+			{
+                for (int i = 0; i < list.Count; i++)
+                {
+                    var segmentId = list[i].Segment;
+                    var fileType = list[i].FileType;
+
+                    if (!list[i].IsUploadBeforeBod)
+                    {
+						if (list[i].FileName == "span")
+                        {
+							//var prefix = "nsccl.";
+							//var date = DateTime.Now.ToString("yyyyMMdd");
+							//var spanFileCount = CoreProcess.spanFileInfo.Count + 1;
+							//var suffix = "i" + spanFileCount.ToString("D2") + ".spn";
+
+							//var fileName = prefix + date + "." + suffix;
+
+                            var sourcePath = Config.MasterPath + "/" + "span";
+                            //var destinationPath = list[i].DestinationPath + "/" + fileName;
+                            //var resp = CoreProcess.CopyFileData(sourcePath, destinationPath);
+
+                            //if (resp.StatusCode == StatusCode.Success)
+                            {
+                                //CoreProcess.spanFileInfo.TryAdd(spanFileCount, new(){ FileName = fileName, TimeStamp = DateTime.Now });
+                                CoreProcess.InitWatcher(1, sourcePath);
+                                Console.WriteLine($"Watcher init for varelm {sourcePath}");
+                                //FileSystemWatcher fileSystemWatcher = new(sourcePath);
+                                //fileSystemWatcher.Created += new FileSystemEventHandler(OnChanged);
+                                //fileSystemWatcher.EnableRaisingEvents = true;
+                                //SendFileUploadStatus(list[i], true, "Sucess");
+                                //Log.Info(resp.Message);
+                            }
+                            //else
+                            //{
+                            //    SendFileUploadStatus(list[i], false, "Failure");
+                            //    Log.Error($"Failure while copying span file");
+                            //}
+                        }
+						else if (list[i].FileName == "varelm")
+						{
+                            //var prefix = "C_VAR_";
+                            //var date = DateTime.Now.ToString("ddMMyyyy");
+							//var elmFileCount = CoreProcess.varElmFileInfo.Count + 1;
+							
+							//var fileName = prefix + date + "_" + elmFileCount + ".DAT";
+
+                            var sourcePath = Config.MasterPath + "/" + "varelm";
+							//var destinationPath = list[i].DestinationPath + "/" + fileName;
+							//var resp = CoreProcess.CopyFileData(sourcePath, destinationPath);
+
+							//if(resp.StatusCode == StatusCode.Success)
+							{
+								//CoreProcess.varElmFileInfo.TryAdd(elmFileCount, new() { FileName = fileName, TimeStamp = DateTime.Now });
+								CoreProcess.InitWatcher(2,sourcePath);
+                                Console.WriteLine($"Watcher init for varelm {sourcePath}");
+
+                                //FileSystemWatcher fileSystemWatcher2 = new(sourcePath);
+                                //fileSystemWatcher2.Created += new FileSystemEventHandler(OnChanged);
+                                //fileSystemWatcher2.EnableRaisingEvents = true;
+                                //SendFileUploadStatus(list[i], true, "Sucess");
+                                Log.Info("Sucess");
+                            }
+                            //else
+                            //{
+                            //    SendFileUploadStatus(list[i], false, resp.Message);
+                            //    Log.Error(resp.Message);
+                            //}
+                        }
+                    }
+                }
+            }
+        }
+        private void OnChanged(object source, FileSystemEventArgs e)
+        {
+            System.IO.FileInfo fileInfo = new(e.FullPath);
+			var fileName = fileInfo.Name;
+			var filePath = e.FullPath;
+
+			string[] pathInfo = filePath.Split('\\');
+			if(pathInfo.Length == 3)
+			{
+				string[] innerArr = pathInfo[1].Split('/');
+				if(innerArr.Length == 2)
+                {
+                    if (innerArr[1] == "span")
+                    {
+                        var spanFileInfo = CoreProcess.filePathInfo.Where(y => y.FileName == "span").FirstOrDefault();
+                        if (spanFileInfo != null)
+                        {
+                            var destinationPath = spanFileInfo.DestinationPath + "/" + fileName;
+
+                            var resp = CoreProcess.CopyFileData(filePath, destinationPath);
+                            if (resp.StatusCode == StatusCode.Success)
+                            {
+                                var spanFileCount = CoreProcess.spanFileInfo.Count + 1;
+                                CoreProcess.spanFileInfo.TryAdd(spanFileCount, new() { FileName = fileName, TimeStamp = DateTime.Now });
+                                SendAfterBodFileUploadStatus(spanFileInfo, true, resp.Message, fileName);
+                                Log.Info(resp.Message);
+                            }
+                        }
+                    }
+                    else if (innerArr[1] == "varelm")
+                    {
+                        var varElmInfo = CoreProcess.filePathInfo.Where(y => y.FileName == "varelm").FirstOrDefault();
+                        if (varElmInfo != null)
+                        {
+                            var destinationPath = varElmInfo.DestinationPath + "/" + fileName;
+
+                            var resp = CoreProcess.CopyFileData(filePath, destinationPath);
+                            if (resp.StatusCode == StatusCode.Success)
+                            {
+                                var elmFile = CoreProcess.varElmFileInfo.Count + 1;
+                                CoreProcess.varElmFileInfo.TryAdd(elmFile, new() { FileName = fileName, TimeStamp = DateTime.Now });
+                                SendAfterBodFileUploadStatus(varElmInfo, true, resp.Message, fileName);
+                                Log.Info(resp.Message);
+                            }
+                        }
+                    }
+                }
+			}
+        }
+        private void SendAfterBodFileUploadStatus(FilePathInfo filePathInfo, bool status, string message, string fileName)
+        {
+            FileStatus fileStatus = new()
+            {
+                MessageCode = (int)CMA_OpCode.FILE_UPLOAD_CONFIRMATION,
+                BrokerId = Config.BrokerId,
+                SiteId = Config.SiteId,
+                AgentId = Config.AgentWorkerId,
+                FileName = fileName,
+                FileType = filePathInfo.FileType,
+                Segment = filePathInfo.Segment,
+                IsSucessStatus = status,
+                Message = message,
+                TimeStamp = DateTime.Now
+            };
+            CoreProcess.wsClientManager.Enqueue(fileStatus);
+        }
+    }
+}
+
+
+using AgentWorker.Global;
+using AgentWorker.Listener;
+using BinaryProtocol.Common;
+using CTCL.CacheManagement.ComponentSessionManager;
+using Utility.ComponentInstance;
+
+namespace AgentWorker.Core
+{
+    public class InterfaceProcessor
+    {
+        ComponentInstanceSetup componentInstanceSetup;
+        private static Dictionary<string, ListenerOfMQ> listenerFromMQ; // All Listener 
+        public ComponentSessionManager componentSessionManager;
+
+        public InterfaceProcessor()
+        {
+            //componentInstanceSetup = new ComponentInstanceSetup(Config.connectionString);
+            listenerFromMQ = new();
+            componentSessionManager = new();
+        }
+        public Response Init()
+        {
+            Response response = new Response();
+            var omsInterfaces = componentInstanceSetup.GetInterface(ComponentType.AgentWorker, Config.AgentWorkerId); // interfaces.Tables[0];
+
+            if (omsInterfaces.StatusCode != StatusCode.Success)
+            {
+                return response.Set(StatusCode.OMS_Error, "My Interfaces couldn't be loaded.." + omsInterfaces.Message);
+            }
+
+            //int i = 0;
+            foreach (var component in (List<ComponentInstanceInterface>)omsInterfaces.ExtraInfo)
+            {
+                var queueConfiguration = new QueueConfiguration
+                {
+                    ExchangeName = component.Configuration.ExchangeName,
+                    HostName = component.Configuration.HostName,
+                    MQName = component.Configuration.MQName,
+                    PassWord = component.Configuration.PassWord,
+                    Port = component.Configuration.Port,
+                    UserName = component.Configuration.UserName,
+                    VirtualHost = component.Configuration.VirtualHost
+                };
+                //AgentWorker as Destination
+                if (component.DestComponentInfo.ComponentType == ComponentType.AgentWorker && component.DestComponentInfo.InstanceId == Config.AgentWorkerId)
+                {
+                    ListenerOfMQ listenerOfMQ;
+                    if (!listenerFromMQ.TryGetValue(component.Route, out listenerOfMQ))
+                    {
+                        listenerOfMQ = new ListenerOfMQ(queueConfiguration);
+                        listenerFromMQ.Add(component.Route, listenerOfMQ);
+                    }
+                    //Add Source
+                    listenerOfMQ.AddSource(component.SourceComponentInfo);
+                }
+            }
+            return response.Set(StatusCode.Success, "Interfaces loaded.." + omsInterfaces.Message);
+        }
+        public Response InitNew(int srcComponentId, int srcInstanceId)
+        {
+            Response response = new Response();
+
+            string nvcRoute = $"{((ComponentType)srcComponentId).ToString()}{srcInstanceId}_{ComponentType.AgentWorker}{Config.AgentWorkerId}|" +
+                $"{((ComponentType)srcComponentId).ToString()}{srcInstanceId}_{ComponentType.AgentWorker}{Config.AgentWorkerId}|" +
+                $"{Config.RabbitLogin}|{Config.RabbitPwd}|/|{Config.RabbitIp}|{Config.RabbitPort}";
+
+            ComponentType srcCompId = (ComponentType)srcComponentId;
+            int srcInstId = srcInstanceId;
+
+            ComponentType destCompId = (ComponentType)ComponentType.AgentWorker;
+            int destInstId = Config.AgentWorkerId;
+
+            var sep = nvcRoute.Split('|');
+            if (sep.Length != 7)
+            {
+                return response.Set(StatusCode.Failure, "Route is not proper!!!");
+            }
+
+            string ExName = sep[0];
+            string MQName = sep[1];
+            string UserName = sep[2];
+            string PassWord = sep[3];
+            string VirtualHost = sep[4];
+            string HostName = sep[5];
+            int Port = Convert.ToInt32(sep[6]);
+
+            ComponentInstanceInterface componentInstanceInterface = new();
+            componentInstanceInterface.Configuration = new()
+            {
+                ExchangeName = ExName,
+                MQName = MQName,
+                UserName = UserName,
+                PassWord= PassWord,
+                VirtualHost = VirtualHost,
+                HostName = HostName,
+                Port = Port,
+            };
+            componentInstanceInterface.Route = nvcRoute;
+            componentInstanceInterface.DestComponentInfo = new ComponentInfo
+            {
+                ComponentType = destCompId,
+                InstanceId = destInstId
+            };
+
+            componentInstanceInterface.SourceComponentInfo = new ComponentInfo
+            {
+                ComponentType = srcCompId,
+                InstanceId = srcInstId
+            };
+
+            ListenerOfMQ listenerOfMQ;
+            if (!listenerFromMQ.TryGetValue(componentInstanceInterface.Route, out listenerOfMQ))
+            {
+                listenerOfMQ = new ListenerOfMQ(componentInstanceInterface.Configuration);
+                listenerFromMQ.Add(componentInstanceInterface.Route, listenerOfMQ);
+            }
+            //Add Source
+            listenerOfMQ.AddSource(componentInstanceInterface.SourceComponentInfo);
+            InitListeners(listenerOfMQ);
+            return response.Set(StatusCode.Success, "Interfaces loaded..");
+        }
+        public void InitListeners(ListenerOfMQ mq)
+        {
+            ConsoleLog.ConsoleWrite("INIT RABBIT");
+
+            var componentInfoData = mq.GetComponentInfo();
+            ComponentSession dbSession = new();
+            dbSession.ComponentType = componentInfoData.Item1;
+            dbSession.instanceId = componentInfoData.Item2;
+            componentSessionManager.Add(dbSession);
+            var sessionAdd = componentSessionManager.Get(componentInfoData.Item1, componentInfoData.Item2);
+            if (sessionAdd.Item1.StatusCode == StatusCode.Success)
+            {
+                mq.AddComponentSession(sessionAdd.Item2);
+            }
+
+            var mqRes = mq.Initialize();
+            // ConsoleLog.ConsoleWrite($"INIT RABBIT COMPLETE {componentInfoData.Item1}");
+            ConsoleLog.ConsoleWrite($"INIT RABBIT COMPLETE ");
+        }
+    }
+}
+
+
+using AgentWorker.Global;
+using AgentWorker.Models.Request;
+using CTCL.BinaryProtocol.Common.CMA.Enum;
+using CTCL.BinaryProtocol.Common.CTCL;
+using CTCL.WebSocketDotNetty;
+using Utility.Queueing;
+
+namespace AgentWorker.Core
+{
+	public class WebSocketClientManager
+    {
+        private InteractiveProcessQueue _interactiveProcessQueue;
+		private WebSocketClient _client;
+        private ProcessQueue<object> queue;
+        private Thread thread;
+
+        public WebSocketClientManager(string url)
+        {
+            queue = new ProcessQueue<object>();
+            _interactiveProcessQueue = new InteractiveProcessQueue();
+			_client = new WebSocketClient();
+			_client.OnMessageReceived += OnDataReceived;
+			_client.OnClientConnect += OnClientConnect;
+			_client.OnClientDisconnect += OnClientDisConnect;
+			_client.init();
+            thread = new Thread(new ThreadStart(ListenQueue));
+            thread.Start();
+            Init(url);
+		}
+
+		private void Init(string url)
+		{
+			Uri uri = new Uri(url);
+			_client.ConnectAsync(uri);
+		}
+
+		private void OnDataReceived(object message, bool isBinaryMessage)
+		{
+			var data = message.ToString();
+			_interactiveProcessQueue.Enqueue(data);
+		}
+
+		private void OnClientConnect()
+		{
+			Log.Info("Web socket connected");
+
+            AgentHandshakeReq handshakeReq = PrepareHandshakeReq();
+            SendNew(handshakeReq);
+		}
+
+		private void OnClientDisConnect()
+		{
+			Log.Info("Web socket Disconnected");
+		}
+
+		private void Send(object res)
+		{
+            _client.SendAsync(res);
+        }
+        private void SendNew(object res)
+        {
+            _client.SendAsyncNew(res);
+        }
+
+        public void Enqueue(object data)
+        {
+            queue.Enqueue(data);
+        }
+
+        private void ListenQueue()
+        {
+            while (true)
+            {
+                if (queue.TryDequeue(out object res))
+                {
+                    Process(res);
+                }
+            }
+        }
+
+        private void Process(object res)
+        {
+            try
+            {
+                SendNew(res);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex.Message);
+            }
+        }
+        private AgentHandshakeReq PrepareHandshakeReq()
+        {
+            AgentHandshakeReq handshakeReq = new()
+            {
+                MessageCode = (int)CMA_OpCode.AGENT_HANDSHAKE_REQ,
+                IP = Config.LocalIp
+            };
+            return handshakeReq;
+        }
+    }
+}
+
+
+using BinaryProtocol.Common;
+using Exchange.Logs;
+using Serilog.Core;
+using Serilog.Events;
+using Serilog;
+using AgentWorker.Global;
+using AgentWorker.Processor;
+using System.Net;
+using AgentWorker.MasterCache;
+using AgentWorker.Models.Response;
+using System.Diagnostics;
+using CTCL.BinaryProtocol.Common.CMA.Enum;
+
+namespace AgentWorker.Core
+{
+    public class CoreProcess
+    {
+        public static Response response;
+        private static LogProcessor logProcessor;
+        public static InterfaceProcessor interfaceProcessor;
+        public static ComponentHandshakeManager handshakeManager;
+        public static FileDataCache fileDataCache;
+        public static WebSocketClientManager wsClientManager;
+        public static List<FilePathInfo> filePathInfo;
+        public static ComponentDataCache compDataCache;
+        public static Dictionary<(ComponentType, int), ComponentManager> componentManager;
+        public static Dictionary<int, SpanFileInfo> spanFileInfo;
+        public static Dictionary<int, SpanFileInfo> varElmFileInfo;
+        public static Dictionary<int, FileSystemWatcher> fileSystemWatcherDict;
+
+        public static Response Initialize()
+        {
+            response = new();
+            LogConfiguration logConfiguration = new LogConfiguration
+            {
+                FilesizeLimitBytes = 50000000,
+                LogFileNameWithPath = Config.logfile,
+                LoggingLevelSwitch = new LoggingLevelSwitch
+                {
+                    MinimumLevel = Config.logLevel == 0 ? LogEventLevel.Debug : (LogEventLevel)Config.logLevel,
+                },
+                OutputTemplate = "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u5}] {Message:lj}{NewLine}{Exception}",
+                RetainedFileCount = Config.logFileCount,
+                RollingInterval = RollingInterval.Day,
+                RollOnFileSizeLimit = true,
+            };
+
+            LogType logType = (LogType)Config.logLevel;
+
+            if (logProcessor == null)
+            {
+                logProcessor = new LogProcessor(logConfiguration);
+            }
+
+            spanFileInfo = new();
+            varElmFileInfo = new();
+            fileDataCache = new();
+            compDataCache = new();
+            handshakeManager = new();
+            componentManager = new();
+            fileSystemWatcherDict = new();
+            InitLocalIp();
+            //Config.GetConfigurationSettings();
+            //CacheOnLoad.LoadAllCacheData();
+            interfaceProcessor = new();
+            //interfaceProcessor.Init();
+            //interfaceProcessor.InitListeners();
+            wsClientManager = new(Config.WebSocketUrl);
+            return new Response()
+            {
+                Message = ""
+            };
+        }
+        public static Response SendToLogQueue(LogObject data)
+        {
+            if (!data.Equals(default(LogObject)) && logProcessor != null)
+            {
+                return logProcessor.Enqueue(data);
+            }
+            else if (logProcessor == null)
+            {
+                return response.Set(StatusCode.OMS_Failure, "logProcessor is null");
+            }
+            else
+            {
+                return response.Set(StatusCode.OMS_Failure, "data is null");
+            }
+        }
+        public static Response InitLocalIp()
+        {
+            Response response = new Response();
+            Global.Log.Info($"Fetching Local IP adress");
+            var host = Dns.GetHostEntry(Dns.GetHostName());
+            foreach (var ip in host.AddressList)
+            {
+                if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                {
+                    Config.LocalIp = ip.ToString();
+                    Global.Log.Info($"Local IP adress {Config.LocalIp}");
+                }
+            }
+            return response.Set(StatusCode.Success, "Sucess");
+        }
+
+        public static Response StartComponent(ComponentType componentType, int instanceId, bool isRunAsService, string requestID)
+        {
+            Response response = new Response();
+            if (componentManager.TryGetValue((componentType, instanceId), out var component) && component != null)
+            {
+                response = component.StartComponent(isRunAsService, requestID);
+            }
+            else
+            {
+                response.Set(StatusCode.Failure, $"Component infomation is not found for {componentType} and instanceID {instanceId}");
+            }
+
+            ComponentStatus componentStatus = new()
+            {
+                ComponentType = (int)componentType,
+                InstanceId = instanceId,
+                IsSucessStatus = false,
+                Message = response.Message,
+                MessageCode = 0
+            };
+            //send on web socket
+
+            return response;
+        }
+
+        public static Response StopComponent(ComponentType componentType, int instanceId)
+        {
+            Response response = new Response();
+            if (componentManager.TryGetValue((componentType, instanceId), out var component) && component != null)
+            {
+                response = component.StopComponent();
+            }
+            else
+            {
+                response.Set(StatusCode.Failure, $"Component infomation is not found for {componentType} and instanceID {instanceId}");
+            }
+
+            //send on web socket 
+            var resp = Helper.Helper.PrepareComponentStatus((int)componentType, instanceId, response.StatusCode == StatusCode.Success ? (int)CMA_StatusCode.Stopped : (int)CMA_StatusCode.Completed, "");
+            if (response.StatusCode == StatusCode.Success)
+            {
+                SetIsRunning(componentType, instanceId, false);
+            }
+            wsClientManager.Enqueue(resp);
+            return response;
+        }
+
+        public static Response CopyFileData(string sourcePath, string destinationPath)
+        {
+            Response response = new();
+
+            try
+            {
+                if (!File.Exists(destinationPath))
+                {
+                    File.Copy(sourcePath, destinationPath);
+                    response.Set(StatusCode.Success, $"File copied from {sourcePath} to {destinationPath} sucessfully");
+                }
+                else
+                {
+                    response.Set(StatusCode.Failure, $"File already exists");
+                }
+            }
+            catch (Exception ex)
+            {
+                response.Set(StatusCode.Failure, $"Exception occured while copy file {ex}");
+            }
+
+            return response;
+        }
+
+        public static void SetIsRunning(ComponentType componentType, int instanceId, bool flag)
+        {
+            Response response = new Response();
+            if (componentManager.TryGetValue((componentType, instanceId), out var component) && component != null)
+            {
+                component.SetIsRunning(flag);
+            }
+        }
+
+        public static bool GetIsRunning(ComponentType componentType, int instanceId)
+        {
+            Response response = new Response();
+            if (componentManager.TryGetValue((componentType, instanceId), out var component) && component != null)
+            {
+                return component.GetIsRunning();
+            }
+            return false;
+        }
+
+        public static void SetExistingProcess(ComponentType componentType, int instanceId)
+        {
+            if (componentManager.TryGetValue((componentType, instanceId), out var component) && component != null)
+            {
+                component.SetExistingProcess();
+            }
+        }
+
+        public static void SendTechnicalDataOfServer()
+        {
+            ManualResetEvent _mre = new ManualResetEvent(false);
+            Task.Factory.StartNew(() =>
+            {
+                while (true)
+                {
+                    _mre.WaitOne(10000);
+                    var cpu = GetCPUValue();
+                    var ram = GetMemValue();
+
+                    //send to FE on websocket
+                    ComponentTechincalInfo componentTechincalInfo = new()
+                    {
+                        MessageCode = (int)CMA_OpCode.CMA_TECHNICAL_PARAM_REQ,
+                        ComponentType = -1,
+                        InstanceId = Config.AgentWorkerId,
+                        CPUPercentage = cpu,
+                        RAMUsage = ram,
+                    };
+                    wsClientManager.Enqueue(componentTechincalInfo);
+                }
+            });
+        }
+
+        private static int GetCPUValue()
+        {
+            int result = 0;
+            try
+            {
+                var cpuCounter = new PerformanceCounter("Processor", "% Processor Time", "_Total");
+                cpuCounter.NextValue();
+                Thread.Sleep(1000);
+                return (int)cpuCounter.NextValue();
+            }
+            catch (Exception ex)
+            {
+                Global.Log.Error($"Exception occured while fetching server cpu | {ex}");
+            }
+            return result;
+        }
+
+        private static int GetMemValue()
+        {
+            int result = 0;
+            try
+            {
+                var memCounter = new PerformanceCounter("Memory", "% Committed Bytes in  Use");
+                return (int)memCounter.NextValue();
+            }
+            catch (Exception ex)
+            {
+                Global.Log.Error($"Exception occured while fetching server ram | {ex}");
+            }
+            return result;
+        }
+
+        public class SpanFileInfo
+        {
+            public string FileName;
+            public DateTime TimeStamp;
+        }
+
+        public static void InitWatcher(int id, string sourcePath)
+        {
+            //FileWatcherClass fileWatcherClass = new();
+            FileSystemWatcher fileSystemWatcher = new(sourcePath);
+            fileSystemWatcher.Created += new FileSystemEventHandler(OnChanged);
+            fileSystemWatcher.EnableRaisingEvents = true;
+            fileSystemWatcherDict.TryAdd(id, fileSystemWatcher);
+
+            Console.WriteLine($"Watcher init for span {sourcePath}");
+        }
+        private static void OnChanged(object source, FileSystemEventArgs e)
+        {
+            Console.WriteLine($"Onchange invoked {e.FullPath}");
+            System.IO.FileInfo fileInfo = new(e.FullPath);
+            var fileName = fileInfo.Name;
+            var filePath = e.FullPath;
+
+            DirectoryInfo diretory = new DirectoryInfo(filePath);
+            string foldername = diretory.Parent.Name;
+
+            if (foldername == "span")
+            {
+                var spanFileInfo = CoreProcess.filePathInfo.Where(y => y.FileName == "span").FirstOrDefault();
+                if (spanFileInfo != null)
+                {
+                    var destinationPath = spanFileInfo.DestinationPath + "/" + fileName;
+
+                    var resp = CoreProcess.CopyFileData(filePath, destinationPath);
+                    if (resp.StatusCode == StatusCode.Success)
+                    {
+                        var spanFileCount = CoreProcess.spanFileInfo.Count + 1;
+                        CoreProcess.spanFileInfo.TryAdd(spanFileCount, new() { FileName = fileName, TimeStamp = DateTime.Now });
+                        SendAfterBodFileUploadStatus(spanFileInfo, true, resp.Message, fileName);
+                        Global.Log.Info(resp.Message);
+                    }
+                }
+            }
+            else if (foldername == "varelm")
+            {
+                var varElmInfo = CoreProcess.filePathInfo.Where(y => y.FileName == "varelm").FirstOrDefault();
+                if (varElmInfo != null)
+                {
+                    var destinationPath = varElmInfo.DestinationPath + "/" + fileName;
+
+                    var resp = CoreProcess.CopyFileData(filePath, destinationPath);
+                    if (resp.StatusCode == StatusCode.Success)
+                    {
+                        var elmFile = CoreProcess.varElmFileInfo.Count + 1;
+                        CoreProcess.varElmFileInfo.TryAdd(elmFile, new() { FileName = fileName, TimeStamp = DateTime.Now });
+                        SendAfterBodFileUploadStatus(varElmInfo, true, resp.Message, fileName);
+                        Global.Log.Info(resp.Message);
+                    }
+                }
+            }
+
+
+        }
+        private static void SendAfterBodFileUploadStatus(FilePathInfo filePathInfo, bool status, string message, string fileName)
+        {
+            FileStatus fileStatus = new()
+            {
+                MessageCode = (int)CMA_OpCode.FILE_UPLOAD_CONFIRMATION,
+                BrokerId = Config.BrokerId,
+                SiteId = Config.SiteId,
+                AgentId = Config.AgentWorkerId,
+                FileName = fileName,
+                FileType = filePathInfo.FileType,
+                Segment = filePathInfo.Segment,
+                IsSucessStatus = status,
+                Message = message,
+                TimeStamp = DateTime.Now
+            };
+            CoreProcess.wsClientManager.Enqueue(fileStatus);
+        }
+    }
+    public class FileWatcherClass
+    {
+        public FileSystemWatcher fileSystemWatcher;
+    }
+}
+
+
+using AgentWorker.Global;
+using AgentWorker.Models.Response;
+using BinaryProtocol.Common;
+using CTCL.BinaryProtocol.Common.CMA.Enum;
+using System.Diagnostics;
+using System.Management;
+using System.ServiceProcess;
+
+namespace AgentWorker.Core
+{
+	public class ComponentManager
+	{
+		private ComponentType componentType;
+		private int InstanceId;
+		private string exePath=string.Empty;
+		private string CmdParameters;
+		private Process _process;
+		private int PID;
+		private string processName;
+		ManualResetEvent _mre;
+		private bool isRunAsService;
+		private string serviceName;
+		private bool isRunning;
+		private CancellationTokenSource CancellationTokenSource;
+		private CancellationToken token;
+		public ComponentManager(ComponentInfoData componentInfoData)
+		{
+			componentType = (ComponentType)componentInfoData.ComponentType;
+			InstanceId = componentInfoData.InstanceId;
+			exePath = string.IsNullOrEmpty(componentInfoData.ExecutablePath)?string.Empty: componentInfoData.ExecutablePath;
+			CmdParameters = componentInfoData.CmdParameters;
+			_mre = new ManualResetEvent(false);
+			serviceName = componentInfoData.ServiceName;
+		}
+
+		public Response StartComponent(bool isRunAsServiceInput, string requestId)
+		{
+			Response response= new Response();
+			isRunAsService= isRunAsServiceInput;
+			
+			if (_process != null && !_process.HasExited)
+			{
+				StopComponent();
+			}
+
+			if (isRunAsService)
+			{
+				ServiceController service = new ServiceController(serviceName);
+				try
+				{
+					TimeSpan timeout = TimeSpan.FromMilliseconds(Config.serviceTimerOut);
+
+					service.Start();
+					service.WaitForStatus(ServiceControllerStatus.Running, timeout);
+					response.Set(StatusCode.Success, $"Service started {serviceName}");
+
+					string query = $"Select ProcessId FROM Win32_Service WHERE Name = {serviceName}";
+					ManagementObjectSearcher searcher = new ManagementObjectSearcher(query);
+					ManagementObjectCollection collections = searcher.Get();
+
+					foreach (ManagementObject collection in collections)
+					{
+						int processId = 0;
+						processId = Convert.ToInt32(collection["ProcessId"]);
+						Process process = Process.GetProcessById(processId);
+						if (process != null)
+						{
+							_process = process;
+							processName = _process.ProcessName.Trim();
+							StartComponentOperationInfoTracking();
+							// send message on websocket of running  process;
+						}
+					}
+				}
+				catch (Exception ex)
+				{
+					Log.Error($"Exception occured while running service {serviceName} | {ex}");
+					response.Set(StatusCode.Failure, $"Exception occured while running service {serviceName} | {ex}");
+				}
+			}
+			else
+			{
+				var cmdParameters = $"{CmdParameters} --rid={requestId}"; 
+				_process = new Process();
+				_process.StartInfo = new ProcessStartInfo()
+				{
+					FileName = exePath,
+					Arguments = cmdParameters,
+					UseShellExecute = true,
+					RedirectStandardOutput = false,
+					RedirectStandardError = false,
+					CreateNoWindow = false
+				};
+				try
+				{
+					_process.Start();
+					PID = _process.Id;
+					processName = _process.ProcessName.Trim();
+					ConsoleLog.ConsoleWrite($"Process started with PID {_process.Id} | Name {_process.ProcessName} | instanceId {InstanceId}");
+					response.Set(StatusCode.Success, $"Process started with PID {_process.Id} | Name {_process.ProcessName} | instanceId {InstanceId}");
+				 	//StartComponentOperationInfoTracking();
+				}
+
+				catch (Exception ex)
+				{
+					Log.Error($"Exception occured while running the process | instanceId {InstanceId} {ex} ");
+					response.Set(StatusCode.Failure, $"Exception occured while running the process | instanceId {InstanceId} {ex}");
+				}
+			}
+
+			return response;
+		}
+
+		public Response StopComponent()
+		{
+			Response response= new Response();
+			if (isRunAsService)
+			{
+				ServiceController service = new ServiceController(serviceName);
+				try
+				{
+					TimeSpan timeout = TimeSpan.FromMilliseconds(Config.serviceTimerOut);
+					CancellationTokenSource.Cancel();
+					service.Stop();
+					service.WaitForStatus(ServiceControllerStatus.Stopped, timeout);
+                    SetIsRunning(false);
+                    response.Set(StatusCode.Success, $"Service stopped {serviceName}");
+				
+				}
+				catch(Exception ex)
+				{
+					Log.Error($"Exception occured while stopping service {serviceName}");
+					response.Set(StatusCode.Failure, $"Exception occured while stopping service {serviceName}");
+				}
+			}
+			else
+			{
+				if (_process != null && !_process.HasExited)
+				{
+					try
+					{
+						if(CancellationTokenSource!=null)
+							CancellationTokenSource.Cancel();
+						_process.Kill();
+						_process.WaitForExit();
+						SetIsRunning(false);
+						ConsoleLog.ConsoleWrite($"Process stopped {PID} | Name {processName} | instanceId {InstanceId}");
+						response.Set(StatusCode.Success, $"Process stopped {PID} | Name {processName} | instanceId {InstanceId}");
+					}
+					catch (Exception ex)
+					{
+						Log.Error($"An error occured while stopping the process | instanceId {InstanceId} : {ex}");
+						response.Set(StatusCode.Failure, $"An error occured while stopping the process | instanceId {InstanceId} : {ex}");
+					}
+
+				}
+				else
+				{
+					Log.Info($"Process is already stopped or was never started | instanceId {InstanceId} ");
+					response.Set(StatusCode.Failure, $"Process is already stopped or was never started {processName} | instanceId {InstanceId}");
+				}
+			}
+			return response;
+		}
+
+		public bool GetIsRunning()
+		{
+			return isRunning;
+		}
+
+		public void SetIsRunning(bool flag)
+		{
+			isRunning = flag;
+			if(isRunning)
+            {
+                if (_process == null || _process.Id == 0 || _process.HasExited)
+                {
+                    SetExistingProcess();
+                }
+            }
+			else
+			{
+				_process = null;
+			}
+		}
+		
+		public void SetExistingProcess()
+		{
+			try
+			{
+				string wmiQery = string.Format("select CommandLine, ProcessId, Name from Win32_Process where ExecutablePath='{0}'", exePath.Replace("\\", "\\\\"));
+				ManagementObjectSearcher searcher = new ManagementObjectSearcher(wmiQery);
+				ManagementObjectCollection collections = searcher.Get();
+
+				foreach (ManagementObject collection in collections)
+				{
+					Console.WriteLine("{0} | {1} | {2}", collection["CommandLine"], collection["ProcessId"], collection["Name"]);
+
+					string ags = $"{collection["Name"]} {componentType}_{InstanceId}";
+
+					var processId = GetProcessIdOfExistingProcess(ags);
+					Process process = Process.GetProcessById(processId);
+					if (process != null)
+					{
+						_process = process;
+						processName = _process.ProcessName;
+						StartComponentOperationInfoTracking();
+						// send message on websocket of running  process;
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				Log.Error($"Exception occured while setting existing process | {ex}");
+				// send message on websocket;
+			}
+			
+		}
+
+		private void StartComponentOperationInfoTracking()
+		{
+			if(CancellationTokenSource != null)
+			{
+				CancellationTokenSource.Cancel();
+			}
+			CancellationTokenSource = new CancellationTokenSource();
+			token = CancellationTokenSource.Token;
+			try
+			{
+				Task.Factory.StartNew(() =>
+				{
+					while (true)
+					{
+						_mre.WaitOne(10000);
+						if (token.IsCancellationRequested) break;
+						
+						var cpu = GetCPU();
+						var ram = GetRam();
+						Console.WriteLine($"{componentType} | {InstanceId} | CPU usage {cpu:F2}% | Working SET Memory {ram:F2} MB");
+						//send to FE on websocket
+						ComponentTechincalInfo componentTechincalInfo = new()
+						{
+							MessageCode = (int)CMA_OpCode.CMA_TECHNICAL_PARAM_REQ,
+							ComponentType = (int)componentType,
+							InstanceId = InstanceId,
+							CPUPercentage = cpu,
+							RAMUsage = ram,
+							TimeStamp = DateTime.Now
+						};
+						CoreProcess.wsClientManager.Enqueue(componentTechincalInfo);
+					};
+				}, token);
+			}
+			catch (Exception ex)
+			{
+				Log.Error($"Exception occured in technical parametrs {ex}");
+			}
+		}
+
+		private double GetCPU()
+		{
+			try
+            {
+                if (_process != null && !_process.HasExited)
+                {
+                    _process.Refresh();
+                    TimeSpan startCpu = _process.TotalProcessorTime;
+                    DateTime startTIme = DateTime.UtcNow;
+                    Thread.Sleep(1000);
+                    TimeSpan endCPU = _process.TotalProcessorTime;
+                    DateTime endTime = DateTime.UtcNow;
+
+                    double cpuUsedMs = (endCPU - startCpu).TotalMilliseconds;
+                    double totalMS = (endTime - startTIme).TotalMilliseconds;
+                    return cpuUsedMs / Environment.ProcessorCount / totalMS * 100;
+                }
+                return 0.0;
+            }
+			catch (Exception ex)
+            {
+                Log.Error($"Error while Getting CPU | {ex.Message}");
+                return 0.0;
+            }
+		}
+
+		private double GetRam()
+		{
+			try
+            {
+                if (_process != null && !_process.HasExited)
+                {
+                    _process.Refresh();
+                    Thread.Sleep(1000);
+                    return (_process.WorkingSet64) / 1024.0 / 1024.0;
+                }
+                return 0.0;
+            }
+			catch (Exception ex)
+			{
+				Log.Error($"Error while Getting RAM | {ex.Message}");
+				return 0.0;
+			}
+		}
+
+		private int GetProcessIdOfExistingProcess(string args)
+		{
+			int processId = 0;
+			try
+			{
+				Process process = new Process();
+				process.StartInfo = new ProcessStartInfo()
+				{
+					FileName = Config.batchFilePath,
+					Arguments = args,
+					UseShellExecute = false,
+					RedirectStandardOutput = true,
+					RedirectStandardError = true,
+					CreateNoWindow = true,
+				};
+				process.Start();
+
+				string[] output = process.StandardOutput.ReadToEnd().Split("\r\n");
+				string error = process.StandardError.ReadToEnd();
+				//set processId
+				if (!string.IsNullOrEmpty(output[0]))
+				{
+					processId = Convert.ToInt32(output[0]);
+				}
+				process.WaitForExit();
+
+			}
+			catch (Exception ex)
+			{
+				Log.Error($"Exception occured while reading batch output | {ex}");
+			}
+			
+			return processId;
+		}
+
+	}
+
+}
+
+
+namespace AgentWorker.Core
+{
+    using Microsoft.Extensions.Configuration;
+    using System;
+
+    public static class AppSettingHelper
+    {
+        static AppSettingHelper()
+        {
+            Configuration = new ConfigurationBuilder()
+             .SetBasePath(ProcessDirectory)
+             .AddJsonFile("appsettings.json")
+             .Build();
+        }
+
+        public static string ProcessDirectory
+        {
+            get
+            {
+                return AppDomain.CurrentDomain.BaseDirectory;
+            }
+        }
+
+        public static IConfigurationRoot Configuration { get; }
+    }
+}
+
 using LoginSignupCore.Data;
 using LoginSignupCore.Models;
 using Microsoft.AspNetCore.Mvc;
