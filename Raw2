@@ -147,3 +147,2149 @@ app.MapControllerRoute(
 app.MapHub<NotificationHub>("/notificationHub"); // Add this line
 
 app.Run();
+
+
+
+
+
+
+
+
+
+using LoginSignupCore.Core;
+using LoginSignupCore.Global;
+using LoginSignupCore.MasterCache;
+using LoginSignupCore.Models;
+using Microsoft.Extensions.Logging;
+using System.Data.SqlClient;
+
+namespace LoginSignupCore.Data
+{
+    public class AgentRepository
+    {
+        public void InsertUpdateData(AgentMaster agentMaster)
+        {
+            using (var connection = new SqlConnection(Config.connectionString))
+            {
+                string query =
+                    "INSERT INTO AgentMaster (nvcAgentName,intBrokerId,intBrokerSiteId,nvcInstanceIP,nvcRemarks,dtmCreatedOn,intCreatedBy)" +
+                    "VALUES(@nvcAgentName,@intBrokerId,@intBrokerSiteId,@nvcInstanceIP,@nvcRemarks,@dtmCreatedOn,@intCreatedBy)" +
+                    "SELECT SCOPE_IDENTITY()";
+                using (var command = new SqlCommand(query,connection))
+                {
+                    command.Parameters.AddWithValue("@nvcAgentName", agentMaster.AgentName);
+                    command.Parameters.AddWithValue("@intBrokerId", agentMaster.BrokerId);
+                    command.Parameters.AddWithValue("@intBrokerSiteId", agentMaster.BrokerSiteId);
+                    command.Parameters.AddWithValue("@nvcInstanceIP", agentMaster.nvcInstanceIP);
+                    command.Parameters.AddWithValue("@nvcRemarks", agentMaster.Remarks);
+                    command.Parameters.AddWithValue("@dtmCreatedOn", agentMaster.DtmCreationDate);
+                    command.Parameters.AddWithValue("@intCreatedBy", agentMaster.IntCreatedBy);
+                    connection.Open();
+                    object id = command.ExecuteScalar();
+                    if(id != null)
+                    {
+                        _ = int.TryParse(id.ToString(), out int agentId);
+                        if(agentId != 0)
+                        {
+                            AgentSessionInfo agentSessionInfo = new();
+                            agentSessionInfo.AgentId = agentId;
+                            agentSessionInfo.BrokerId = agentMaster.BrokerId;
+                            agentSessionInfo.SiteId = agentMaster.BrokerSiteId;
+                            agentSessionInfo.IP = agentMaster.nvcInstanceIP;
+                            agentSessionInfo.AgentName = agentMaster.AgentName;
+
+                            CoreProcess.ipSessionCache.AddOrUpdate(agentSessionInfo);
+                            CoreProcess.agentSessionCache.AddOrUpdate(agentSessionInfo);
+                        }
+                    }
+                }
+
+            }
+        }
+        public List<AgentMaster> GetAllAgents(int brokerid, int siteid,int isdelete=0)
+        {
+            var agents = new List<AgentMaster>();
+            using (var connection = new SqlConnection(Config.connectionString))
+            {
+                string query = "SELECT intAgentId,nvcAgentName,intBrokerId,intBrokerSiteId,nvcInstanceIP,IsActive,IsDeleted,nvcRemarks,dtmCreatedOn,intCreatedBy,dtmUpdatedOn,intUpdatedBy " +
+                    "from AgentMaster where intBrokerId=@intBrokerId and intBrokerSiteId=@intBrokerSiteId and IsDeleted=@IsDeleted";
+                using (var command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@intBrokerId", brokerid);
+                    command.Parameters.AddWithValue("@intBrokerSiteId", siteid);
+                    command.Parameters.AddWithValue("@IsDeleted", isdelete);
+                    connection.Open();
+                    using (var reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            AgentMaster agent = new AgentMaster();
+                            agent.AgentId = reader.GetInt32(reader.GetOrdinal("intAgentId"));
+                            agent.AgentName = reader.GetString(reader.GetOrdinal("nvcAgentName"));
+                            agent.BrokerId = reader.GetInt32(reader.GetOrdinal("intBrokerId"));
+                            agent.BrokerSiteId = reader.GetInt32(reader.GetOrdinal("intBrokerSiteId"));
+                            agent.nvcInstanceIP = reader.GetString(reader.GetOrdinal("nvcInstanceIP"));
+                            agent.IsActive = Convert.ToInt32(reader.GetBoolean(reader.GetOrdinal("IsActive")));
+                            agent.IsDeleted = Convert.ToInt32(reader.GetBoolean(reader.GetOrdinal("IsDeleted")));
+                            agent.Remarks = reader.GetString(reader.GetOrdinal("nvcRemarks"));
+                            agent.DtmCreationDate = reader.GetDateTime(reader.GetOrdinal("dtmCreatedOn"));
+                            agent.DtmUpdationDate = (reader.IsDBNull(reader.GetOrdinal("dtmUpdatedOn")) ? DateTime.MinValue
+                                                       : reader.GetDateTime(reader.GetOrdinal("dtmUpdatedOn")));
+                            agent.IntCreatedBy = reader.GetInt32(reader.GetOrdinal("intCreatedBy"));
+                            agent.IntUpdatedBy = reader.IsDBNull(reader.GetOrdinal("intUpdatedBy")) ? -1 : reader.GetInt32(reader.GetOrdinal("intUpdatedBy"));
+                            agents.Add(agent);
+                        }
+                    }
+                }
+
+            }
+            return agents;
+        }
+        public AgentMaster GetAgentById(int agentID)
+        {
+            var agent = new AgentMaster();
+            using (var connection = new SqlConnection(Config.connectionString))
+            {
+                string query = "SELECT intAgentId,nvcAgentName,intBrokerId,intBrokerSiteId,nvcInstanceIP,IsActive,IsDeleted,nvcRemarks,dtmCreatedOn,intCreatedBy,dtmUpdatedOn,intUpdatedBy from AgentMaster where intAgentId=@intAgentId";
+                using (var command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@intAgentId", agentID);
+                    
+                    connection.Open();
+                    using (var reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+
+                            agent.AgentId = reader.GetInt32(reader.GetOrdinal("intAgentId"));
+                            agent.AgentName = reader.GetString(reader.GetOrdinal("nvcAgentName"));
+                            agent.BrokerId = reader.GetInt32(reader.GetOrdinal("intBrokerId"));
+                            agent.BrokerSiteId = reader.GetInt32(reader.GetOrdinal("intBrokerSiteId"));
+                            agent.nvcInstanceIP = reader.GetString(reader.GetOrdinal("nvcInstanceIP"));
+                            agent.IsActive = Convert.ToInt32(reader.GetBoolean(reader.GetOrdinal("IsActive")));
+                            agent.IsDeleted = Convert.ToInt32(reader.GetBoolean(reader.GetOrdinal("IsDeleted")));
+                            agent.Remarks = reader.GetString(reader.GetOrdinal("nvcRemarks"));
+                            agent.DtmCreationDate = reader.GetDateTime(reader.GetOrdinal("dtmCreatedOn"));
+                            agent.DtmUpdationDate = (reader.IsDBNull(reader.GetOrdinal("dtmUpdatedOn")) ? DateTime.MinValue
+                                                       : reader.GetDateTime(reader.GetOrdinal("dtmUpdatedOn")));
+                            agent.IntCreatedBy = reader.GetInt32(reader.GetOrdinal("intCreatedBy"));
+                            agent.IntUpdatedBy = reader.IsDBNull(reader.GetOrdinal("intUpdatedBy")) ? -1 : reader.GetInt32(reader.GetOrdinal("intUpdatedBy"));
+                           
+                        }
+                    }
+                }
+
+            }
+            return agent;
+        }
+        public int UpdateData(AgentMaster agentMaster)
+        {
+            int rowAffected;
+            using (var connection = new SqlConnection(Config.connectionString))
+            {
+                string query = "update AgentMaster set nvcAgentName=@nvcAgentName,nvcInstanceIP=@nvcInstanceIP," +
+                    "nvcRemarks=@nvcRemarks,dtmUpdatedOn=@dtmUpdatedOn,intUpdatedBy=@intUpdatedBy where intAgentId=@intAgentId";
+
+
+                using (var command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@intAgentId", agentMaster.AgentId);
+                    command.Parameters.AddWithValue("@nvcAgentName", agentMaster.AgentName);
+                    command.Parameters.AddWithValue("@nvcInstanceIP", agentMaster.nvcInstanceIP);
+                    command.Parameters.AddWithValue("@nvcRemarks", agentMaster.Remarks);
+                    command.Parameters.AddWithValue("@dtmUpdatedOn", agentMaster.DtmUpdationDate);
+                    command.Parameters.AddWithValue("@intUpdatedBy", agentMaster.IntUpdatedBy);
+                    connection.Open();
+                    rowAffected = command.ExecuteNonQuery();
+                    
+                  
+                }
+
+            }
+            if(rowAffected>0)  //rowAffected=1 or any
+            {
+                var agentSessionInfo = new AgentSessionInfo()
+                {
+                    AgentId = agentMaster.AgentId,
+                    BrokerId = agentMaster.BrokerId,
+                    SiteId = agentMaster.BrokerSiteId,
+                    IP = agentMaster.nvcInstanceIP,
+                    AgentName = agentMaster.AgentName
+                };
+                CoreProcess.agentSessionCache.AddOrUpdate(agentSessionInfo);
+                CoreProcess.ipSessionCache.AddOrUpdate(agentSessionInfo);
+            }
+            return rowAffected;
+
+
+            //AgentSessionInfo agentSessionInfo = new();
+            //agentSessionInfo.AgentId = agentId;
+            //agentSessionInfo.BrokerId = agentMaster.BrokerId;
+            //agentSessionInfo.SiteId = agentMaster.BrokerSiteId;
+            //agentSessionInfo.IP = agentMaster.nvcInstanceIP;
+            //agentSessionInfo.AgentName = agentMaster.AgentName;
+
+            //CoreProcess.ipSessionCache.AddOrUpdate(agentSessionInfo);
+            //CoreProcess.agentSessionCache.AddOrUpdate(agentSessionInfo);
+        }
+        public int DeleteData(AgentMaster agentMaster)
+        {
+            using (var connection = new SqlConnection(Config.connectionString))
+            {
+                string query = "update AgentMaster set IsDeleted=@IsDeleted,nvcRemarks=@nvcRemarks,dtmUpdatedOn=@dtmUpdatedOn,intUpdatedBy=@intUpdatedBy where intAgentId=@intAgentId";
+
+
+                using (var command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@intAgentId", agentMaster.AgentId);
+                    command.Parameters.AddWithValue("@IsDeleted", agentMaster.IsDeleted);
+                    command.Parameters.AddWithValue("@nvcRemarks", agentMaster.Remarks);
+                    command.Parameters.AddWithValue("@dtmUpdatedOn", agentMaster.DtmUpdationDate);
+                    command.Parameters.AddWithValue("@intUpdatedBy", agentMaster.IntUpdatedBy);
+                    connection.Open();
+                    int rowAffected = command.ExecuteNonQuery();
+                    return rowAffected;
+                }
+
+            }
+        }
+        public int UpdateIsActiveData(AgentMaster agentMaster)
+        {
+            using (var connection = new SqlConnection(Config.connectionString))
+            {
+                string query = "update AgentMaster set IsActive=@IsActive,nvcRemarks=@nvcRemarks,dtmUpdatedOn=@dtmUpdatedOn,intUpdatedBy=@intUpdatedBy where intAgentId=@intAgentId";
+
+
+                using (var command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@intAgentId", agentMaster.AgentId);
+                    command.Parameters.AddWithValue("@IsActive", agentMaster.IsActive);
+                    command.Parameters.AddWithValue("@nvcRemarks", agentMaster.Remarks);
+                    command.Parameters.AddWithValue("@dtmUpdatedOn", agentMaster.DtmUpdationDate);
+                    command.Parameters.AddWithValue("@intUpdatedBy", agentMaster.IntUpdatedBy);
+                    connection.Open();
+                    int rowAffected = command.ExecuteNonQuery();
+                    return rowAffected;
+                }
+
+            }
+        }
+    }
+}
+
+
+
+using CTCL.BinaryProtocol.Common.CTCL.Enum;
+using LoginSignupCore.Core;
+using LoginSignupCore.Global;
+using LoginSignupCore.Models;
+using System.Data.SqlClient;
+using ComponentMaster = LoginSignupCore.Models.ComponentMaster;
+
+namespace LoginSignupCore.Data
+{
+    public class ComponentMasterRepository
+    {
+        public void InsertComponentMasterData(ComponentMaster componentMaster)
+        {
+            using var connection = new SqlConnection(Config.connectionString);
+            string query =
+                "INSERT INTO ComponentMaster(intComponentId,nvcComponentName,numCpuThreshold,numRamThreshold,intPriority,dtmCreatedOn,intCreatedBy,bitIsActive,bitIsDelete)" +
+                " VALUES (@intComponentId,@nvcComponentName,@numCpuThreshold,@numRamThreshold,@intPriority,@dtmCreatedOn,@intCreatedBy,@bitIsActive,@bitIsDelete)";
+            using var command = new SqlCommand(query, connection);
+            command.Parameters.AddWithValue("@intComponentId", componentMaster.IntComponentId);
+            command.Parameters.AddWithValue("@nvcComponentName", componentMaster.NvcComponentName);
+            command.Parameters.AddWithValue("@numCpuThreshold", componentMaster.CpuThreshold);
+            command.Parameters.AddWithValue("@numRamThreshold", componentMaster.RamThreshold);
+            command.Parameters.AddWithValue("@intPriority", componentMaster.IntPriority);
+            command.Parameters.AddWithValue("@dtmCreatedOn", DateTime.Now.Date);
+            command.Parameters.AddWithValue("@intCreatedBy", globals.User_ID);
+            command.Parameters.AddWithValue("@bitIsActive", 1);
+            command.Parameters.AddWithValue("@bitIsDelete", 0);
+            connection.Open();
+            command.ExecuteNonQuery();
+        }
+        public List<ComponentMaster> Get()
+        {
+            var components = new List<ComponentMaster>();
+            using (var connection = new SqlConnection(Config.connectionString))
+            {
+                string query = "SELECT intId,intComponentId,nvcComponentName,numCpuThreshold,numRamThreshold,intPriority,dtmCreatedOn,intCreatedBy,dtmUpdatedOn,intUpdatedBy,bitIsActive,bitIsDelete" +
+                    " from ComponentMaster where  bitIsDelete=@bitIsDelete";
+                using var command = new SqlCommand(query, connection);
+
+                command.Parameters.AddWithValue("@bitIsDelete", 0);
+                connection.Open();
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    ComponentMaster component = new ComponentMaster();
+                    component.Id = reader.GetInt32(reader.GetOrdinal("intId"));
+                    component.IntComponentId = reader.GetInt32(reader.GetOrdinal("intComponentId"));
+                    component.NvcComponentName = reader.GetString(reader.GetOrdinal("nvcComponentName"));
+                    component.CpuThreshold = (double)reader.GetDecimal(reader.GetOrdinal("numCpuThreshold"));
+                    component.RamThreshold = (double)reader.GetDecimal(reader.GetOrdinal("numRamThreshold"));
+                    component.IntPriority = reader.GetInt32(reader.GetOrdinal("intPriority"));
+                    component.BitIsActive = reader.GetInt32(reader.GetOrdinal("bitIsActive"));
+                    components.Add(component);
+                }
+            }
+            return components;
+        }
+        public ComponentMaster GetcompById(int id)
+        {
+            var component = new ComponentMaster();
+            using (var connection = new SqlConnection(Config.connectionString))
+            {
+                string query = "SELECT intId,intComponentId,nvcComponentName,numCpuThreshold,numRamThreshold,intPriority,dtmCreatedOn,intCreatedBy,dtmUpdatedOn,intUpdatedBy,bitIsActive,bitIsDelete from ComponentMaster where intId = @intId";
+                using (var command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@intId", id);
+
+                    connection.Open();
+                    using (var reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            component.Id = reader.GetInt32(reader.GetOrdinal("intId"));
+                            component.IntComponentId = reader.GetInt32(reader.GetOrdinal("intComponentId"));
+                            component.NvcComponentName = reader.GetString(reader.GetOrdinal("nvcComponentName"));
+                            component.CpuThreshold = Convert.ToDouble(reader.GetDecimal(reader.GetOrdinal("numCpuThreshold")));
+                            component.RamThreshold = Convert.ToDouble(reader.GetDecimal(reader.GetOrdinal("numRamThreshold")));
+                            component.IntPriority = reader.GetInt32(reader.GetOrdinal("intPriority"));
+                            component.BitIsActive = reader.GetInt32(reader.GetOrdinal("bitIsActive"));
+                            component.BitIsDelete = reader.GetInt32(reader.GetOrdinal("bitIsDelete"));
+
+
+                        }
+                    }
+                }
+
+            }
+            return component;
+        }
+
+        public int UpdateIsActiveData(ComponentMaster Master)
+        {
+            int rowAffected;
+            using (SqlConnection conn = new SqlConnection(Config.connectionString))
+            {
+                SqlCommand cmd = new SqlCommand("Update  ComponentMaster Set BitIsActive = @BitIsActive,DtmUpdatedOn =@DtmUpdatedOn,IntUpdatedBy =@IntUpdatedBy Where intId = @intId", conn);
+
+                cmd.Parameters.AddWithValue("@intId", Master.Id);
+                cmd.Parameters.AddWithValue("@BitIsActive", Master.BitIsActive);
+                cmd.Parameters.AddWithValue("@DtmUpdatedOn", Master.DtmUpdatedOn);
+                cmd.Parameters.AddWithValue("@IntUpdatedBy", Master.IntUpdatedBy);
+                conn.Open();
+                rowAffected= cmd.ExecuteNonQuery();
+               
+            }
+            if(rowAffected>0)
+            {
+                var compMaster = new Component()
+                {
+                    BrokerId=Master.Id,
+                    AgentId=Master.IntComponentId,
+
+                };
+                CoreProcess.agentSessionCache.AddOrUpdate(compMaster);
+            }
+            return rowAffected;
+        }
+    }
+}
+
+
+
+using BinaryProtocol.Common;
+using LoginSignupCore.Core;
+using LoginSignupCore.MasterCache;
+using LoginSignupCore.Models.Response;
+using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
+using System.Data;
+using System.Security.Policy;
+
+namespace LoginSignupCore.Global
+{
+    public static class CacheOnLoad
+    {
+        public static void LoadAllCacheData()
+       {
+            GetAgentMasterData();
+            GetAgentWiseComponentMasterData();
+            GetAgentWiseFileInfoMasterData();
+            GetSiteWiseMasterData();
+            GetComponentStatus();
+            GetFileStatus();
+            GetCompTechnicalInfo();
+        }
+
+        public static Response GetAgentMasterData()
+        {
+            Response response = new Response();
+            DataSet ds;
+            ds = CommonHelper.ExecuteProcedureForDataSet("usp_GetAgentMaster");
+            if (ds == null)
+            {
+                return response.Set(StatusCode.OMS_Error, "Agent Master Info not loaded.");
+            }
+            FillAgentMasterInfoData(ds.Tables[0]);
+            return response.Set(StatusCode.OMS_Success, "Agent Master Info loaded.");
+        }
+        private static Response FillAgentMasterInfoData(DataTable dataTable)
+        {
+            Response response = new Response();
+            try
+            {
+                foreach (DataRow dr in dataTable.Rows)
+                {
+                    AgentSessionInfo agentSessionInfo = new();
+                    agentSessionInfo.AgentId = Convert.ToInt32(dr["intAgentId"] == DBNull.Value ? 0 : dr["intAgentId"]);
+                    agentSessionInfo.BrokerId = Convert.ToInt32(dr["intBrokerId"] == DBNull.Value ? 0 : dr["intBrokerId"]);
+                    agentSessionInfo.SiteId = Convert.ToInt32(dr["intBrokerSiteId"] == DBNull.Value ? 0 : dr["intBrokerSiteId"]);
+                    agentSessionInfo.IP = dr["nvcInstanceIP"] == DBNull.Value ? "" : dr["nvcInstanceIP"].ToString();
+                    agentSessionInfo.AgentName = dr["nvcAgentName"] == DBNull.Value ? "" : dr["nvcAgentName"].ToString();
+
+                    CoreProcess.agentSessionCache.AddOrUpdate(agentSessionInfo);
+                    CoreProcess.ipSessionCache.AddOrUpdate(agentSessionInfo);
+                }
+                return response.Set(StatusCode.Success, "Agent Master Info filled successfully.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Exception occured while fillingAgent Master Info cache");
+                return response.Set(StatusCode.Failure, "Failed to fill Agent Master Info Dictionary.");
+            }
+        }
+
+        public static Response GetAgentWiseComponentMasterData()
+        {
+            Response response = new Response();
+            DataSet ds;
+            ds = CommonHelper.ExecuteProcedureForDataSet("usp_GetAgentMasterWiseComponents");
+            if (ds == null)
+            {
+                return response.Set(StatusCode.OMS_Error, "Agent Wise ComponentMaster Info not loaded.");
+            }
+            FillAgentWiseComponentMasterData(ds.Tables[0]);
+            return response.Set(StatusCode.OMS_Success, "Agent Wise ComponentMaster Info loaded.");
+        }
+        private static Response FillAgentWiseComponentMasterData(DataTable dataTable)
+        {
+            Response response = new Response();
+            try
+            {
+                foreach (DataRow dr in dataTable.Rows)
+                {
+                    ComponentMaster compMaster = new();
+                    compMaster.AgentId = Convert.ToInt32(dr["intAgentId"] == DBNull.Value ? 0 : dr["intAgentId"]);
+                    compMaster.BrokerId = Convert.ToInt32(dr["intBrokerId"] == DBNull.Value ? 0 : dr["intBrokerId"]);
+                    compMaster.SiteId = Convert.ToInt32(dr["intBrokerSiteId"] == DBNull.Value ? 0 : dr["intBrokerSiteId"]);
+                    compMaster.ComponentId = Convert.ToInt32(dr["intComponentType"] == DBNull.Value ? 0 : dr["intComponentType"]);
+                    compMaster.InstanceId = Convert.ToInt32(dr["intInstanceId"] == DBNull.Value ? 0 : dr["intInstanceId"]);
+                    compMaster.ExePath = dr["nvcExePath"] == DBNull.Value ? "" : dr["nvcExePath"].ToString();
+                    compMaster.CmdParam = dr["nvcCmdParam"] == DBNull.Value ? "" : dr["nvcCmdParam"].ToString();
+                    compMaster.IsRunAsService = Convert.ToBoolean(dr["bitIsRunAsService"] == DBNull.Value ? 0 : dr["bitIsRunAsService"]);
+                    compMaster.ServiceName = dr["nvcServiceName"] == DBNull.Value ? "" : dr["nvcServiceName"].ToString();
+                    compMaster.Priority = Convert.ToInt32(dr["intPriority"] == DBNull.Value ? 0 : dr["intPriority"]);
+                    compMaster.CpuThresholdLimit = Convert.ToDouble(dr["numCpuThreshold"] == DBNull.Value ? 0 : dr["numCpuThreshold"]);
+                    compMaster.RamThresholdLimit = Convert.ToDouble(dr["numRamThreshold"] == DBNull.Value ? 0 : dr["numRamThreshold"]);
+                    compMaster.ComponentName = dr["nvcComponentName"] == DBNull.Value ? "" : dr["nvcComponentName"].ToString();
+                    compMaster.AgentName = dr["nvcAgentName"] == DBNull.Value ? "" : dr["nvcAgentName"].ToString();
+                    compMaster.IsActive = Convert.ToBoolean(dr["IsActive"] == DBNull.Value ? 0 : dr["IsActive"]);
+                    compMaster.IsDelete = Convert.ToBoolean(dr["IsDeleted"] == DBNull.Value ? 0 : dr["IsDeleted"]);
+                    CoreProcess.agentSessionCache.AddOrUpdate(compMaster);
+                }
+                return response.Set(StatusCode.Success, "Agent Wise Component Master Info filled successfully.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Exception occured while filling Agent Wise ComponentMaster Info cache");
+                return response.Set(StatusCode.Failure, "Failed to fill Agent Wise Component Master Info Dictionary.");
+            }
+        }
+
+        public static Response GetAgentWiseFileInfoMasterData()
+        {
+            Response response = new Response();
+            DataSet ds;
+            ds = CommonHelper.ExecuteProcedureForDataSet("usp_GetAgentToFileMappingMaster");
+            if (ds == null)
+            {
+                return response.Set(StatusCode.OMS_Error, "Agent Wise File Info Master not loaded.");
+            }
+            FillAgentWiseFileInfoMasterData(ds.Tables[0]);
+            return response.Set(StatusCode.OMS_Success, "Agent Wise File Info Master Info loaded.");
+        }
+        private static Response FillAgentWiseFileInfoMasterData(DataTable dataTable)
+        {
+            Response response = new Response();
+            try
+            {
+                foreach (DataRow dr in dataTable.Rows)
+                {
+                    FileMasterInfo fileMasterInfo = new();
+                    fileMasterInfo.AgentId = Convert.ToInt32(dr["intAgentId"] == DBNull.Value ? 0 : dr["intAgentId"]);
+                    fileMasterInfo.BrokerId = Convert.ToInt32(dr["intBrokerId"] == DBNull.Value ? 0 : dr["intBrokerId"]);
+                    fileMasterInfo.SiteId = Convert.ToInt32(dr["intBrokerSiteId"] == DBNull.Value ? 0 : dr["intBrokerSiteId"]);
+                    fileMasterInfo.SegmentId = Convert.ToInt32(dr["intSegmentId"] == DBNull.Value ? 0 : dr["intSegmentId"]);
+                    fileMasterInfo.FileType = Convert.ToInt32(dr["intFileType"] == DBNull.Value ? 0 : dr["intFileType"]);
+                    fileMasterInfo.FileName = dr["nvcFileName"] == DBNull.Value ? "" : dr["nvcFileName"].ToString();
+                    fileMasterInfo.Priority = Convert.ToInt32(dr["intPriority"] == DBNull.Value ? "" : dr["intPriority"]);
+                    fileMasterInfo.IsUploadBeforeBOD = Convert.ToBoolean(dr["isUploadBeforeBod"] == DBNull.Value ? 0 : dr["isUploadBeforeBod"]);
+                    fileMasterInfo.DestinationPath = dr["nvcDestinationPath"] == DBNull.Value ? "" : dr["nvcDestinationPath"].ToString();
+
+                    CoreProcess.agentSessionCache.AddOrUpdate(fileMasterInfo);
+                }
+                return response.Set(StatusCode.Success, "Agent Wise File Info Master filled successfully.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Exception occured while filling Agent Wise FileInfo Master cache");
+                return response.Set(StatusCode.Failure, "Failed to fill Agent Wise File Info Master Dictionary.");
+            }
+        }
+
+        public static Response GetSiteWiseMasterData()
+        {
+            Response response = new Response();
+            DataSet ds;
+            ds = CommonHelper.ExecuteProcedureForDataSet("usp_GetBrokerSites");
+            if (ds == null)
+            {
+                return response.Set(StatusCode.OMS_Error, "Site Wise Master Path not loaded.");
+            }
+            FillSiteWiseMasterData(ds.Tables[0]);
+            return response.Set(StatusCode.OMS_Success, "Site Wise Master Path Info loaded.");
+        }
+        private static Response FillSiteWiseMasterData(DataTable dataTable)
+        {
+            Response response = new Response();
+            try
+            {
+                foreach (DataRow dr in dataTable.Rows)
+                {
+                    int siteId = Convert.ToInt32(dr["id"] == DBNull.Value ? 0 : dr["id"]);
+                    int brokerId = Convert.ToInt32(dr["intBrokerId"] == DBNull.Value ? 0 : dr["intBrokerId"]);
+                    string masterPath = dr["nvcMasterFilePath"] == DBNull.Value ? "" : dr["nvcMasterFilePath"].ToString();
+
+                    CoreProcess.agentSessionCache.AddOrUpdate(brokerId, siteId, masterPath);
+                }
+                return response.Set(StatusCode.Success, "Site Wise Master Path filled successfully.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Exception occured while filling Site Wise Master Path cache");
+                return response.Set(StatusCode.Failure, "Failed to fill Site Wise Master Path Dictionary.");
+            }
+        }
+
+        public static Response GetComponentStatus()
+        {
+            Response response = new Response();
+            DataSet ds;
+            ds = CommonHelper.ExecuteProcedureForDataSet("usp_GetComponentStatus");
+            if (ds == null)
+            {
+                return response.Set(StatusCode.OMS_Error, "Component Status not loaded.");
+            }
+            FillComponentStatusData(ds.Tables[0]);
+            return response.Set(StatusCode.OMS_Success, "Component Status Info loaded.");
+        }
+        private static Response FillComponentStatusData(DataTable dataTable)
+        {
+            Response response = new Response();
+            try
+            {
+                foreach (DataRow dr in dataTable.Rows)
+                {
+                    ComponentStatus componentStatus = new()
+                    {
+                        AgentId = Convert.ToInt32(dr["intAgentId"] == DBNull.Value ? 0 : dr["intAgentId"]),
+                        BrokerId = Convert.ToInt32(dr["intBrokerId"] == DBNull.Value ? 0 : dr["intBrokerId"]),
+                        SiteId = Convert.ToInt32(dr["intSiteId"] == DBNull.Value ? 0 : dr["intSiteId"]),
+                        ComponentType = Convert.ToInt32(dr["intComponentId"] == DBNull.Value ? 0 : dr["intComponentId"]),
+                        InstanceId = Convert.ToInt32(dr["intInstanceId"] == DBNull.Value ? 0 : dr["intInstanceId"]),
+                        ComponentState = Convert.ToInt32(dr["intComponentState"] == DBNull.Value ? 0 : dr["intComponentState"]),
+                        TimeStamp = Convert.ToDateTime(dr["dtmUploadedOn"] == DBNull.Value ? 0 : dr["dtmUploadedOn"]),
+                        IsSucessStatus = Convert.ToBoolean(dr["bitIsSucessStatus"] == DBNull.Value ? 0 : dr["bitIsSucessStatus"]),
+                        Message = dr["nvcRemarks"] == DBNull.Value ? "" : dr["nvcRemarks"].ToString(),
+                        RequestId = dr["nvcRequestId"] == DBNull.Value ? "" : dr["nvcRequestId"].ToString()
+                    };
+
+                    CoreProcess.agentSessionCache.AddOrUpdate(componentStatus);
+
+                    char[] incrementingNumber = new char[14];
+                    char[] Id = componentStatus.RequestId?.ToCharArray();
+
+                    if(Id != null && Id.Length == 32)
+                    {
+                        Array.Copy(Id, 18, incrementingNumber, 0, incrementingNumber.Length);
+
+                        string strId = new(incrementingNumber);
+                        long nId = 0;
+
+                        if (long.TryParse(strId, out long nGatewayONO1) && incrementingNumber.Length > 0)
+                        {
+                            nId = Convert.ToInt64(strId);
+                        }
+
+                        if (Config.Id < nId)
+                        {
+                            Config.Id = nId;
+                        }
+                    }
+                }
+                return response.Set(StatusCode.Success, "Component Status filled successfully.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Exception occured while filling Component Status cache");
+                return response.Set(StatusCode.Failure, "Failed to fill Component Status Dictionary.");
+            }
+        }
+
+        public static Response GetFileStatus()
+        {
+            Response response = new Response();
+            DataSet ds;
+            ds = CommonHelper.ExecuteProcedureForDataSet("usp_GetFileStatus");
+            if (ds == null)
+            {
+                return response.Set(StatusCode.OMS_Error, "File Status not loaded.");
+            }
+            FillFileStatusData(ds.Tables[0]);
+            return response.Set(StatusCode.OMS_Success, "File Status Info loaded.");
+        }
+        private static Response FillFileStatusData(DataTable dataTable)
+        {
+            Response response = new Response();
+            try
+            {
+                foreach (DataRow dr in dataTable.Rows)
+                {
+                    FileStatus fileStatus = new()
+                    {
+                        AgentId = Convert.ToInt32(dr["intAgentId"] == DBNull.Value ? 0 : dr["intAgentId"]),
+                        BrokerId = Convert.ToInt32(dr["intBrokerId"] == DBNull.Value ? 0 : dr["intBrokerId"]),
+                        SiteId = Convert.ToInt32(dr["intSiteId"] == DBNull.Value ? 0 : dr["intSiteId"]),
+                        FileType = Convert.ToInt32(dr["intFileType"] == DBNull.Value ? 0 : dr["intFileType"]),
+                        Segment = Convert.ToInt32(dr["intSegment"] == DBNull.Value ? 0 : dr["intSegment"]),
+                        FileName = dr["nvcFileName"] == DBNull.Value ? "" : dr["nvcFileName"].ToString(),
+                        TimeStamp = Convert.ToDateTime(dr["dtmUploadedOn"] == DBNull.Value ? 0 : dr["dtmUploadedOn"]),
+                        IsSucessStatus = Convert.ToBoolean(dr["bitIsSucessStatus"] == DBNull.Value ? 0 : dr["bitIsSucessStatus"]),
+                        Message = dr["nvcRemarks"] == DBNull.Value ? "" : dr["nvcRemarks"].ToString()
+                    };
+
+                    CoreProcess.agentSessionCache.AddOrUpdate(fileStatus);
+                }
+                return response.Set(StatusCode.Success, "File Status filled successfully.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Exception occured while filling File Status cache");
+                return response.Set(StatusCode.Failure, "Failed to fill File Status Dictionary.");
+            }
+        }
+
+        public static Response GetCompTechnicalInfo()
+        {
+            Response response = new Response();
+            DataSet ds;
+            ds = CommonHelper.ExecuteProcedureForDataSet("usp_GetCompTechnicalInfo");
+            if (ds == null)
+            {
+                return response.Set(StatusCode.OMS_Error, "Comp Technical Info not loaded.");
+            }
+            FillCompTechnicalInfo(ds.Tables[0]);
+            return response.Set(StatusCode.OMS_Success, "Comp Technical Info loaded.");
+        }
+        private static Response FillCompTechnicalInfo(DataTable dataTable)
+        {
+            Response response = new Response();
+            try
+            {
+                foreach (DataRow dr in dataTable.Rows)
+                {
+                    ComponentsTechnicalInfo componentsTechnicalInfo = new()
+                    {
+                        AgentId = Convert.ToInt32(dr["intAgentId"] == DBNull.Value ? 0 : dr["intAgentId"]),
+                        BrokerId = Convert.ToInt32(dr["intBrokerId"] == DBNull.Value ? 0 : dr["intBrokerId"]),
+                        SiteId = Convert.ToInt32(dr["intSiteId"] == DBNull.Value ? 0 : dr["intSiteId"]),
+                        ComponentId = Convert.ToInt32(dr["intComponentId"] == DBNull.Value ? 0 : dr["intComponentId"]),
+                        InstanceId = Convert.ToInt32(dr["intInstanceId"] == DBNull.Value ? 0 : dr["intInstanceId"]),
+                        RAMUtilization = Convert.ToDouble(dr["numRamUtilization"] == DBNull.Value ? 0 : dr["numRamUtilization"]),
+                        CPUUtilization = Convert.ToDouble(dr["numCpuUtilization"] == DBNull.Value ? 0 : dr["numCpuUtilization"]),
+                        CPUHigh = Convert.ToDouble(dr["numCpuHigh"] == DBNull.Value ? 0 : dr["numCpuHigh"]),
+                        CPULow = Convert.ToDouble(dr["numCpuLow"] == DBNull.Value ? 0 : dr["numCpuLow"]),
+                        RAMHigh = Convert.ToDouble(dr["numRamHigh"] == DBNull.Value ? 0 : dr["numRamHigh"]),
+                        RAMLow = Convert.ToDouble(dr["numRamLow"] == DBNull.Value ? 0 : dr["numRamLow"]),
+                        Timestamp =(dr["dtmUpdatedOn"] == DBNull.Value ? "": dr["dtmUpdatedOn"]).ToString(),
+                       
+                    };
+                    componentsTechnicalInfo.ComponentName = ((ComponentType)componentsTechnicalInfo.ComponentId).ToString();
+                    componentsTechnicalInfo.AgentName =  CoreProcess.agentSessionCache.GetSession(componentsTechnicalInfo.BrokerId, componentsTechnicalInfo.SiteId, componentsTechnicalInfo.AgentId).Item2?.AgentName??string.Empty;
+
+                    CoreProcess.agentSessionCache.AddOrUpdate(componentsTechnicalInfo);
+                }
+                return response.Set(StatusCode.Success, "Comp Technical Info filled successfully.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Exception occured while filling Comp Technical Info cache");
+                return response.Set(StatusCode.Failure, "Failed to fill Comp Technical Info Dictionary.");
+            }
+        }
+    }
+}
+
+
+using LoginSignupCore.Data;
+using LoginSignupCore.Models;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
+using Microsoft.EntityFrameworkCore;
+using System.Data;
+using CTCL.BinaryProtocol.Common.CTCL.Enum;
+using Microsoft.AspNetCore.Mvc.Rendering;
+using System.Linq;
+
+namespace LoginSignupCore.Controllers
+{
+    public class ComponentMasterController : Controller
+    {
+        private readonly ComponentMasterRepository componentMasterRepository;
+        private readonly ApplicatonDBContext _dbcontext;
+
+        public ComponentMasterController(ApplicatonDBContext context)
+        {
+            componentMasterRepository = new();
+            _dbcontext = context;
+        }
+        public IActionResult Components()
+        {
+            ClaimsPrincipal claimUser = HttpContext.User;
+            if (!(claimUser.Identity.IsAuthenticated))
+            {
+                globals.User_ID = 0;
+                return RedirectToAction("Login", "Account");
+            }
+            return View();
+        }
+
+        [HttpGet]
+        public IActionResult ComponentFile(int id)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            var component = componentMasterRepository.GetcompById(id);
+            return PartialView("Components", component);
+        }
+
+
+
+        public IActionResult Clear()
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            ViewBag.successStatus = null;
+            return RedirectToAction("DisplayData", "ComponentMaster");
+        }
+
+        public async Task<IActionResult> Logout()
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            globals.User_ID = 0;
+            return RedirectToAction("Login", "Account");
+        }
+
+        [HttpPost]
+        public IActionResult Components(ComponentMaster componentMaster)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            ViewBag.successStatus = 0;
+
+            try
+            {
+                if (ModelState.IsValid)
+                {
+                    componentMasterRepository.InsertComponentMasterData(componentMaster);
+                    ViewBag.successStatus = 1;
+                    return RedirectToAction("DisplayData");
+                }
+            }
+            catch (Exception ex)
+            {
+                // ViewBag.successStatus = 0;
+                string msg = string.Empty;
+                if (!string.IsNullOrEmpty(ex.Message))
+                {
+                    var arr = ex.Message.Split(".");
+                    msg = arr[1]+":"+arr[3];
+                    //ViewBag.message = msg;
+                }
+                if (ex.Message.Contains("unique_priority"))
+                {
+                    TempData["ErrorMessage"] = "Priority already exists, Kindly modify the priority and retry! ";
+                }
+                else if (ex.Message.Contains("PK__Componen__238B7F484AB5AB5F"))
+                {
+                    TempData["ErrorMessage"] = "CompomnentId already exists, Kindly modify the componentid and retry!";
+                }
+                return RedirectToAction("DisplayData", componentMaster);
+            }
+            return RedirectToAction("DisplayData", componentMaster);
+        }
+
+        public IActionResult DisplayData(ComponentMaster componentMaster)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            var componentMasters = componentMasterRepository.Get();
+            componentMaster.Components = componentMasters;
+            //ViewBag.model = componentMasters;
+            return View(componentMaster);
+        }
+
+        [HttpPost]
+        public IActionResult ComponentMasterUpdate(ComponentMaster componentMaster)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            ViewBag.successStatus = 0;
+            try
+            {
+                var id = componentMaster.Id;
+                var componentName = componentMaster.NvcComponentName;
+                var dtmupdateon = DateTime.Now;
+                var intUpdatedBy = globals.User_ID;
+                var isActive = 1;
+                string mvalue = Request.Form["BitIsActive"];
+
+                if (mvalue == "1")
+                {
+                    isActive = 1;
+                }
+                else if (mvalue == "on")
+                {
+                    isActive = 1;
+                }
+                else if (mvalue == "1,on")
+                {
+                    isActive = 1;
+                }
+                else if (mvalue == "0,on")
+                {
+                    isActive = 1;
+                }
+                else
+                {
+                    isActive = 0;
+                }
+
+                try
+                {
+                    if (ModelState.IsValid)
+                    {
+                        var cmd = _dbcontext.Database.GetDbConnection().CreateCommand();
+                        {
+                            if (cmd.Connection.State != ConnectionState.Open)
+                            {
+                                cmd.Connection.Open();
+                            }
+                            cmd.CommandText = "update ComponentMaster set intComponentId='" + componentMaster.IntComponentId + "',NvcComponentName='" + componentName + "',numCpuThreshold ='" + componentMaster.CpuThreshold + "',numRamThreshold = '" + componentMaster.RamThreshold + "',intPriority = '" + componentMaster.IntPriority+ "',intUpdatedBy ='" + intUpdatedBy + "',dtmUpdatedOn='" + dtmupdateon + "',BitIsActive='" + 1 + "' where intId='" + componentMaster.Id + "'";
+                            cmd.ExecuteNonQuery();
+                            cmd.Connection.Close();
+
+                            ViewBag.Status = 1;
+                            ViewBag.successStatus = 1;
+
+                            ViewBag.model = componentMaster;
+                            return RedirectToAction("DisplayData", "ComponentMaster");
+                        }
+                    }
+
+                }
+                catch (Exception ee)
+                {
+                    ViewBag.Status = 0;
+                    ViewBag.successStatus = 0;
+                    return RedirectToAction("Edit", "ComponentMaster");
+
+                }
+            }
+            catch (Exception ex)
+            {
+                ViewBag.Status = 0;
+                ViewBag.successStatus = 0;
+                return RedirectToAction("Edit", "ComponentMaster");
+            }
+            ViewBag.Status = 0;
+            ViewBag.successStatus = 0;
+            TempData["componentmaster"] = componentMaster;
+            return RedirectToAction("DisplayData", "ComponentMaster");
+        }
+
+
+        public IActionResult Edit(ComponentMaster _componentMaster)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            var data = new ComponentMaster()
+            {
+                Id = _componentMaster.Id,
+                //BitIsActive = Convert.ToInt32(Request.Form["mvalue"]),
+                BitIsActive = _componentMaster.BitIsActive,
+                NvcComponentName = _componentMaster.NvcComponentName,
+                CpuThreshold = _componentMaster.CpuThreshold,
+                IntPriority = _componentMaster.IntPriority
+
+
+            };
+            //int id = Convert.ToInt32(Request.Form["IntComponentId"]);
+            //var IsActive = Request.Form["mvalue"];
+            //ViewBag.mvalue = IsActive;
+
+            return RedirectToAction("DisplayData", data);
+        }
+
+
+        public IActionResult UpdateIsActive(int id, int isActive)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            var comp = new ComponentMaster()
+            {
+                Id = id,
+                BitIsActive = isActive,
+                DtmUpdatedOn = DateTime.Now,
+                IntUpdatedBy = globals.User_ID
+            };
+            try
+            {
+                int rows = componentMasterRepository.UpdateIsActiveData(comp);
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
+            return RedirectToAction("DisplayData");
+
+        }
+
+
+
+        public bool CheckAuth()
+        {
+            ClaimsPrincipal claimUser = HttpContext.User;
+            if (!claimUser.Identity.IsAuthenticated)
+            {
+                return false;
+            }
+            return true;
+        }
+
+    }
+}
+
+
+
+using CTCL.CacheManagement.Helper;
+using CTCL.CacheManagement.Structs;
+using Exchange.WebSocketServer.SocketManager;
+using LoginSignupCore.Core;
+using LoginSignupCore.Models;
+using LoginSignupCore.Models.Request;
+using LoginSignupCore.Models.Response;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Security.Policy;
+using SocketSession = Exchange.WebSocketServer.SocketManager.SocketSession;
+
+namespace LoginSignupCore.MasterCache
+{
+    public class AgentSessionCache
+    {
+        private ConcurrentDictionary<Id, SiteIdWiseCache> _brokerIdWiseCache;
+        public AgentSessionCache()
+        {
+            _brokerIdWiseCache = new();
+        }
+        public void AddOrUpdate(AgentSessionInfo agentSessionInfo)
+        {
+            Id brokerId = new() { id = agentSessionInfo.BrokerId };
+            if(!_brokerIdWiseCache.TryGetValue(brokerId, out SiteIdWiseCache siteIdWiseCache))
+            {
+                siteIdWiseCache = new();
+                _brokerIdWiseCache.TryAdd(brokerId, siteIdWiseCache);
+            }
+            siteIdWiseCache.AddOrUpdate(agentSessionInfo);
+            }
+        public void AddOrUpdate(ComponentsTechnicalInfo agentFunctionalInfo)
+        {
+            Id brokerId = new() { id = agentFunctionalInfo.BrokerId };
+            if (!_brokerIdWiseCache.TryGetValue(brokerId, out SiteIdWiseCache siteIdWiseCache))
+            {
+                siteIdWiseCache = new();
+                _brokerIdWiseCache.TryAdd(brokerId, siteIdWiseCache);
+            }
+            siteIdWiseCache.AddOrUpdate(agentFunctionalInfo);
+        }
+        public void AddOrUpdate(ComponentMaster componentMaster)
+        {
+            Id brokerId = new() { id = componentMaster.BrokerId };
+            if (!_brokerIdWiseCache.TryGetValue(brokerId, out SiteIdWiseCache siteIdWiseCache))
+            {
+                siteIdWiseCache = new();
+                _brokerIdWiseCache.TryAdd(brokerId, siteIdWiseCache);
+            }
+            siteIdWiseCache.AddOrUpdate(componentMaster);
+        }
+        public void AddOrUpdate(FileStatus fileStatus)
+        {
+            Id brokerId = new() { id = fileStatus.BrokerId };
+            if (!_brokerIdWiseCache.TryGetValue(brokerId, out SiteIdWiseCache siteIdWiseCache))
+            {
+                siteIdWiseCache = new();
+                _brokerIdWiseCache.TryAdd(brokerId, siteIdWiseCache);
+            }
+            siteIdWiseCache.AddOrUpdate(fileStatus);
+        }
+        public void AddOrUpdate(ComponentStatus componentStatus)
+        {           
+            Id brokerId = new() { id = componentStatus.BrokerId };
+            if (!_brokerIdWiseCache.TryGetValue(brokerId, out SiteIdWiseCache siteIdWiseCache))
+            {
+                siteIdWiseCache = new();
+                _brokerIdWiseCache.TryAdd(brokerId, siteIdWiseCache);
+            }
+            siteIdWiseCache.AddOrUpdate(componentStatus);
+        }
+        public void AddOrUpdate(FileMasterInfo fileMasterInfo)
+        {
+            Id brokerId = new() { id = fileMasterInfo.BrokerId };
+            if (!_brokerIdWiseCache.TryGetValue(brokerId, out SiteIdWiseCache siteIdWiseCache))
+            {
+                siteIdWiseCache = new();
+                _brokerIdWiseCache.TryAdd(brokerId, siteIdWiseCache);
+            }
+            siteIdWiseCache.AddOrUpdate(fileMasterInfo);
+        }
+        public void AddOrUpdate(int brokerId, int siteId, string masterPath)
+        {
+            Id bId = new() { id = brokerId };
+            if (!_brokerIdWiseCache.TryGetValue(bId, out SiteIdWiseCache siteIdWiseCache))
+            {
+                siteIdWiseCache = new();
+                _brokerIdWiseCache.TryAdd(bId, siteIdWiseCache);
+            }
+            siteIdWiseCache.AddOrUpdate(siteId, masterPath);
+        }
+        public (bool, List<Component>) GetComponentMaster(int brokerId, int siteId, int agentId)
+        {
+            Id bId = new() { id = brokerId };
+            if (_brokerIdWiseCache.TryGetValue(bId, out SiteIdWiseCache siteIdWiseCache) && siteIdWiseCache != null)
+            {
+                return siteIdWiseCache.GetComponentMaster(siteId, agentId);
+            }
+            return (false, null);
+        }
+        public (bool, List<FileMasterInfo>) GetFileMasterInfo(int brokerId, int siteId, int agentId)
+        {
+            Id bId = new() { id = brokerId };
+            if (_brokerIdWiseCache.TryGetValue(bId, out SiteIdWiseCache siteIdWiseCache) && siteIdWiseCache != null)
+            {
+                return siteIdWiseCache.GetFileMasterInfo(siteId, agentId);
+            }
+            return (false, null);
+        }
+        public (bool, string) GetMasterPath(int brokerId, int siteId)
+        {
+            Id bId = new() { id = brokerId };
+            if (_brokerIdWiseCache.TryGetValue(bId, out SiteIdWiseCache siteIdWiseCache) && siteIdWiseCache != null)
+            {
+                return siteIdWiseCache.GetMasterPath(siteId);
+            }
+            return (false, null);
+        }
+        public (bool, ComponentMaster) GetComponentMaster(CompInitReq compInitReq)
+        {
+            Id bId = new() { id = compInitReq.BrokerId };
+            if (_brokerIdWiseCache.TryGetValue(bId, out SiteIdWiseCache siteIdWiseCache) && siteIdWiseCache != null)
+            {
+                return siteIdWiseCache.GetComponentMaster(compInitReq);
+            }
+            return (false, null);
+        }
+        public (bool, AgentSessionInfo) GetSession(int brokerId, int siteId, int agentId)
+        {
+            Id bId = new() { id = brokerId };
+            if (_brokerIdWiseCache.TryGetValue(bId, out SiteIdWiseCache siteIdWiseCache) && siteIdWiseCache != null)
+            {
+                return siteIdWiseCache.GetSession(siteId, agentId);
+            }
+            return (false, null);
+        }
+        public List<ComponentsTechnicalInfo> GetTechnicalInfo(int brokerid, int siteid)
+        {
+            List<ComponentsTechnicalInfo> list = new();
+            //for(int i=0; i<_brokerIdWiseCache.Count; i++)
+            //{
+                //var info = _brokerIdWiseCache.ElementAt(i).Value;
+                if (_brokerIdWiseCache.TryGetValue(new() { id = brokerid }, out var info )&& info != null)
+                {
+                    list.AddRange(info.GetTechnicalInfo(siteid));
+                }
+           // }
+            return list;
+        }
+        public (bool, ComponentsTechnicalInfo) GetTechnicalInfo(CompInitReq compInitReq)
+        {
+            Id bId = new() { id = compInitReq.BrokerId };
+            if (_brokerIdWiseCache.TryGetValue(bId, out SiteIdWiseCache siteIdWiseCache) && siteIdWiseCache != null)
+            {
+                return siteIdWiseCache.GetTechnicalInfo(compInitReq);
+            }
+            return (false, null);
+        }
+        public List<FileStatus> GetFileStatus(int brokerId, int siteId)
+        {
+            Id bId = new() { id = brokerId };
+            if (_brokerIdWiseCache.TryGetValue(bId, out SiteIdWiseCache siteIdWiseCache) && siteIdWiseCache != null)
+            {
+                return siteIdWiseCache.GetFileStatus(siteId);
+            }
+            return new();
+        }
+        public List<ComponentStatus> GetComponentStatus(int brokerId, int siteId)
+        {
+            Id bId = new() { id = brokerId };
+            if (_brokerIdWiseCache.TryGetValue(bId, out SiteIdWiseCache siteIdWiseCache) && siteIdWiseCache != null)
+            {
+                return siteIdWiseCache.GetComponentStatus(siteId);
+            }
+            return new();
+        }
+        public void AddOrUpdate(CompInitReq compInitReq,bool flag)
+        {
+            Id brokerId = new() { id = compInitReq.BrokerId };
+            if (!_brokerIdWiseCache.TryGetValue(brokerId, out SiteIdWiseCache siteIdWiseCache))
+            {
+                siteIdWiseCache = new();
+                _brokerIdWiseCache.TryAdd(brokerId, siteIdWiseCache);
+            }
+            siteIdWiseCache.AddOrUpdate(compInitReq,flag);
+        }
+        public (bool, List<Component>) GetComponentMaster(int brokerId, int siteId)
+        {
+            Id bId = new() { id = brokerId };
+            if (_brokerIdWiseCache.TryGetValue(bId, out SiteIdWiseCache siteIdWiseCache) && siteIdWiseCache != null)
+            {
+                return siteIdWiseCache.GetComponentMaster(siteId);
+            }
+            return (false, null);
+        }
+        public (bool, List<FileMasterInfo>) GetFileMasterInfo(int brokerId, int siteId)
+        {
+            Id bId = new() { id = brokerId };
+            if (_brokerIdWiseCache.TryGetValue(bId, out SiteIdWiseCache siteIdWiseCache) && siteIdWiseCache != null)
+            {
+                return siteIdWiseCache.GetFileMasterInfo(siteId);
+            }
+            return (false, null);
+        }
+        public void UpdateIsActiveFlag(CompInitReq componentMaster,bool flag)
+        {
+            Id brokerId = new() { id = componentMaster.BrokerId };
+            if (!_brokerIdWiseCache.TryGetValue(brokerId, out SiteIdWiseCache siteIdWiseCache))
+            {
+                siteIdWiseCache = new();
+                _brokerIdWiseCache.TryAdd(brokerId, siteIdWiseCache);
+            }
+            siteIdWiseCache.UpdateIsActiveFlag(componentMaster,flag);
+        }
+        public void UpdateIsDeleteFlag(CompInitReq componentMaster, bool flag)
+        {
+            Id brokerId = new() { id = componentMaster.BrokerId };
+            if (!_brokerIdWiseCache.TryGetValue(brokerId, out SiteIdWiseCache siteIdWiseCache))
+            {
+                siteIdWiseCache = new();
+                _brokerIdWiseCache.TryAdd(brokerId, siteIdWiseCache);
+            }
+            siteIdWiseCache.UpdateIsDeleteFlag(componentMaster, flag);
+        }
+    }
+
+    public class SiteIdWiseCache
+    {
+        private ConcurrentDictionary<Id, AgentIdWiseCache> _siteIdWiseCache;
+        public SiteIdWiseCache()
+        {
+            _siteIdWiseCache = new();
+        }
+        public void AddOrUpdate(AgentSessionInfo agentSessionInfo)
+        {
+            Id siteId = new() { id = agentSessionInfo.SiteId };
+            if (!_siteIdWiseCache.TryGetValue(siteId, out AgentIdWiseCache agentIdWiseCache))
+            {
+                agentIdWiseCache = new();
+                _siteIdWiseCache.TryAdd(siteId, agentIdWiseCache);
+            }
+            agentIdWiseCache.AddOrUpdate(agentSessionInfo);
+        }
+        public void AddOrUpdate(ComponentsTechnicalInfo agentFunctionalInfo)
+        {
+            Id siteId = new() { id = agentFunctionalInfo.SiteId };
+            if (!_siteIdWiseCache.TryGetValue(siteId, out AgentIdWiseCache agentIdWiseCache))
+            {
+                agentIdWiseCache = new();
+                _siteIdWiseCache.TryAdd(siteId, agentIdWiseCache);
+            }
+            agentIdWiseCache.AddOrUpdate(agentFunctionalInfo);
+        }
+        public void AddOrUpdate(ComponentMaster componentMaster)
+        {
+            Id siteId = new() { id = componentMaster.SiteId };
+            if (!_siteIdWiseCache.TryGetValue(siteId, out AgentIdWiseCache agentIdWiseCache))
+            {
+                agentIdWiseCache = new();
+                _siteIdWiseCache.TryAdd(siteId, agentIdWiseCache);
+            }
+            agentIdWiseCache.AddOrUpdate(componentMaster);
+        }
+        public void AddOrUpdate(FileStatus fileStatus)
+        {
+            Id siteId = new() { id = fileStatus.SiteId };
+            if (!_siteIdWiseCache.TryGetValue(siteId, out AgentIdWiseCache agentIdWiseCache))
+            {
+                agentIdWiseCache = new();
+                _siteIdWiseCache.TryAdd(siteId, agentIdWiseCache);
+            }
+            agentIdWiseCache.AddOrUpdate(fileStatus);
+        }
+        public void AddOrUpdate(ComponentStatus componentStatus)
+        {
+            Id siteId = new() { id = componentStatus.SiteId };
+            if (!_siteIdWiseCache.TryGetValue(siteId, out AgentIdWiseCache agentIdWiseCache))
+            {
+                agentIdWiseCache = new();
+                _siteIdWiseCache.TryAdd(siteId, agentIdWiseCache);
+            }
+            agentIdWiseCache.AddOrUpdate(componentStatus);
+        }
+        public void AddOrUpdate(FileMasterInfo fileMasterInfo)
+        {
+            Id siteId = new() { id = fileMasterInfo.SiteId };
+            if (!_siteIdWiseCache.TryGetValue(siteId, out AgentIdWiseCache agentIdWiseCache))
+            {
+                agentIdWiseCache = new();
+                _siteIdWiseCache.TryAdd(siteId, agentIdWiseCache);
+            }
+            agentIdWiseCache.AddOrUpdate(fileMasterInfo);
+        }
+        public void AddOrUpdate(int siteId, string masterPath)
+        {
+            Id sId = new() { id = siteId };
+            if (!_siteIdWiseCache.TryGetValue(sId, out AgentIdWiseCache agentIdWiseCache))
+            {
+                agentIdWiseCache = new();
+                _siteIdWiseCache.TryAdd(sId, agentIdWiseCache);
+            }
+            agentIdWiseCache.AddOrUpdate(masterPath);
+        }
+        public (bool, List<Component>) GetComponentMaster(int siteId, int agentId)
+        {
+            Id sId = new() { id = siteId };
+            if (_siteIdWiseCache.TryGetValue(sId, out AgentIdWiseCache agentIdWiseCache) && agentIdWiseCache != null)
+            {
+                return agentIdWiseCache.GetComponentMaster(agentId);
+            }
+            return (false, null);
+        }
+        public (bool, List<FileMasterInfo>) GetFileMasterInfo(int siteId, int agentId)
+        {
+            Id sId = new() { id = siteId };
+            if (_siteIdWiseCache.TryGetValue(sId, out AgentIdWiseCache agentIdWiseCache) && agentIdWiseCache != null)
+            {
+                return agentIdWiseCache.GetFileMasterInfo(agentId);
+            }
+            return (false, null);
+        }
+        public (bool, string) GetMasterPath(int siteId)
+        {
+            Id sId = new() { id = siteId };
+            if (_siteIdWiseCache.TryGetValue(sId, out AgentIdWiseCache agentIdWiseCache) && agentIdWiseCache != null)
+            {
+                return agentIdWiseCache.GetMasterPath();
+            }
+            return (false, null);
+        }
+        public (bool, ComponentMaster) GetComponentMaster(CompInitReq compInitReq)
+        {
+            Id sId = new() { id = compInitReq.SiteId };
+            if (_siteIdWiseCache.TryGetValue(sId, out AgentIdWiseCache agentIdWiseCache) && agentIdWiseCache != null)
+            {
+                return agentIdWiseCache.GetComponentMaster(compInitReq);
+            }
+            return (false, null);
+        }
+        public (bool, AgentSessionInfo) GetSession(int siteId, int agentId)
+        {
+            Id sId = new() { id = siteId };
+            if (_siteIdWiseCache.TryGetValue(sId, out AgentIdWiseCache agentIdWiseCache) && agentIdWiseCache != null)
+            {
+                return agentIdWiseCache.GetSession(agentId);
+            }
+            return (false, null);
+        }
+        public List<ComponentsTechnicalInfo> GetTechnicalInfo(int siteid)
+        {
+            List<ComponentsTechnicalInfo> list = new();
+            //for (int i = 0; i < _siteIdWiseCache.Count; i++)
+            //{
+                //var info = _siteIdWiseCache.ElementAt(i).Value;
+                if (_siteIdWiseCache.TryGetValue(new Id() {id= siteid },out var info)&& info != null)
+                {
+                    list.AddRange(info.GetTechnicalInfo());
+                }
+           //}
+            return list;
+        }
+        public (bool, ComponentsTechnicalInfo) GetTechnicalInfo(CompInitReq compInitReq)
+        {
+            Id sId = new() { id = compInitReq.SiteId };
+            if (_siteIdWiseCache.TryGetValue(sId, out AgentIdWiseCache agentIdWiseCache) && agentIdWiseCache != null)
+            {
+                return agentIdWiseCache.GetTechnicalInfo(compInitReq);
+            }
+            return (false, null);
+        }
+        public List<FileStatus> GetFileStatus(int siteId)
+        {
+            Id bId = new() { id = siteId };
+            if (_siteIdWiseCache.TryGetValue(bId, out AgentIdWiseCache agentIdWiseCache) && agentIdWiseCache != null)
+            {
+                return agentIdWiseCache.GetFileStatus();
+            }
+            return new();
+        }
+        public List<ComponentStatus> GetComponentStatus(int siteId)
+        {
+            Id bId = new() { id = siteId };
+            if (_siteIdWiseCache.TryGetValue(bId, out AgentIdWiseCache agentIdWiseCache) && agentIdWiseCache != null)
+            {
+                return agentIdWiseCache.GetComponentStatus();
+            }
+            return new();
+        }
+        public void AddOrUpdate(CompInitReq compInitReq, bool flag)
+        {
+            Id siteId = new() { id = compInitReq.SiteId };
+            if (!_siteIdWiseCache.TryGetValue(siteId, out AgentIdWiseCache agentIdWiseCache))
+            {
+                agentIdWiseCache = new();
+                _siteIdWiseCache.TryAdd(siteId, agentIdWiseCache);
+            }
+            agentIdWiseCache.AddOrUpdate(compInitReq, flag);
+        }
+        public (bool, List<Component>) GetComponentMaster(int siteId)
+        {
+            Id sId = new() { id = siteId };
+            if (_siteIdWiseCache.TryGetValue(sId, out AgentIdWiseCache agentIdWiseCache) && agentIdWiseCache != null)
+            {
+                return agentIdWiseCache.GetComponentMaster();
+            }
+            return (false, null);
+        }
+        public (bool, List<FileMasterInfo>) GetFileMasterInfo(int siteId)
+        {
+            Id sId = new() { id = siteId };
+            if (_siteIdWiseCache.TryGetValue(sId, out AgentIdWiseCache agentIdWiseCache) && agentIdWiseCache != null)
+            {
+                return agentIdWiseCache.GetFileMasterInfo();
+            }
+            return (false, null);
+        }
+        public void UpdateIsActiveFlag(CompInitReq componentMaster,bool flag)
+        {
+            Id siteId = new() { id = componentMaster.SiteId };
+            if (!_siteIdWiseCache.TryGetValue(siteId, out AgentIdWiseCache agentIdWiseCache))
+            {
+                agentIdWiseCache = new();
+                _siteIdWiseCache.TryAdd(siteId, agentIdWiseCache);
+            }
+            agentIdWiseCache.UpdateIsActiveFlag(componentMaster,flag);
+        }
+        public void UpdateIsDeleteFlag(CompInitReq componentMaster, bool flag)
+        {
+            Id siteId = new() { id = componentMaster.SiteId };
+            if (!_siteIdWiseCache.TryGetValue(siteId, out AgentIdWiseCache agentIdWiseCache))
+            {
+                agentIdWiseCache = new();
+                _siteIdWiseCache.TryAdd(siteId, agentIdWiseCache);
+            }
+            agentIdWiseCache.UpdateIsDeleteFlag(componentMaster, flag);
+        }
+    }
+
+    public class AgentIdWiseCache
+    {
+        private ConcurrentDictionary<Id, ComponentWiseCache> _agentIdWiseSessionCache;
+        public string MasterPath;
+        private List<FileStatus> _fileStatusDetails;
+        private List<ComponentStatus> _componentStatusDetails;
+        public AgentIdWiseCache()
+        {
+            _agentIdWiseSessionCache = new();
+            _fileStatusDetails = new();
+            _componentStatusDetails = new();
+        }
+        public void AddOrUpdate(AgentSessionInfo agentSessionInfo)
+        {
+            Id agentId = new() { id = agentSessionInfo.AgentId };
+            if (!_agentIdWiseSessionCache.TryGetValue(agentId, out ComponentWiseCache componentWiseCache))
+            {
+                componentWiseCache = new();
+                _agentIdWiseSessionCache.TryAdd(agentId, componentWiseCache);
+            }
+            componentWiseCache.AddOrUpdate(agentSessionInfo);
+        }
+        public void AddOrUpdate(ComponentsTechnicalInfo agentFunctionalInfo)
+        {
+            Id agentId = new() { id = agentFunctionalInfo.AgentId };
+            if (!_agentIdWiseSessionCache.TryGetValue(agentId, out ComponentWiseCache componentWiseCache))
+            {
+                componentWiseCache = new();
+                _agentIdWiseSessionCache.TryAdd(agentId, componentWiseCache);
+            }
+            componentWiseCache.AddOrUpdate(agentFunctionalInfo);
+        }
+        public void AddOrUpdate(ComponentMaster componentMaster)
+        {
+            Id agentId = new() { id = componentMaster.AgentId };
+            if (!_agentIdWiseSessionCache.TryGetValue(agentId, out ComponentWiseCache componentWiseCache))
+            {
+                componentWiseCache = new();
+                _agentIdWiseSessionCache.TryAdd(agentId, componentWiseCache);
+            }
+            componentWiseCache.AddOrUpdate(componentMaster);
+        }
+        public void AddOrUpdate(FileMasterInfo fileMasterInfo)
+        {
+            Id agentId = new() { id = fileMasterInfo.AgentId };
+            if (!_agentIdWiseSessionCache.TryGetValue(agentId, out ComponentWiseCache componentWiseCache))
+            {
+                componentWiseCache = new();
+                _agentIdWiseSessionCache.TryAdd(agentId, componentWiseCache);
+            }
+            componentWiseCache.AddOrUpdate(fileMasterInfo);
+        }
+        public void AddOrUpdate(string masterPath)
+        {
+            MasterPath = masterPath;
+        }
+        public void AddOrUpdate(FileStatus fileStatus)
+        {
+            if (_fileStatusDetails != null)
+            {
+                _fileStatusDetails.Insert(0,fileStatus);
+            }
+        }
+        public void AddOrUpdate(ComponentStatus componentStatus)
+        {
+            if (_componentStatusDetails != null)
+            {
+                _componentStatusDetails.Insert(0,componentStatus);
+            }
+            Id agentId = new() { id = componentStatus.AgentId };
+            if (!_agentIdWiseSessionCache.TryGetValue(agentId, out ComponentWiseCache componentWiseCache))
+            {
+                componentWiseCache = new();
+                _agentIdWiseSessionCache.TryAdd(agentId, componentWiseCache);
+            }
+            componentWiseCache.AddOrUpdate(componentStatus);
+        }
+        public (bool, List<Component>) GetComponentMaster(int agentId)
+        {
+            Id sId = new() { id = agentId };
+            if (_agentIdWiseSessionCache.TryGetValue(sId, out ComponentWiseCache componentWiseCache) && componentWiseCache != null)
+            {
+                return componentWiseCache.GetComponentMaster();
+            }
+            return (false, null);
+        }
+        public (bool, List<FileMasterInfo>) GetFileMasterInfo(int agentId)
+        {
+            Id aId = new() { id = agentId };
+            if (_agentIdWiseSessionCache.TryGetValue(aId, out ComponentWiseCache componentWiseCache) && componentWiseCache != null)
+            {
+                return componentWiseCache.GetFileMasterInfo();
+            }
+            return (false, null);
+        }
+        public (bool, string) GetMasterPath()
+        {
+            return (true, MasterPath);
+        }
+        public (bool, ComponentMaster) GetComponentMaster(CompInitReq compInitReq)
+        {
+            Id sId = new() { id = compInitReq.AgentId };
+            if (_agentIdWiseSessionCache.TryGetValue(sId, out ComponentWiseCache componentWiseCache) && componentWiseCache != null)
+            {
+                return componentWiseCache.GetComponentMaster(compInitReq);
+            }
+            return (false, null);
+        }
+        public (bool, AgentSessionInfo) GetSession(int agentId)
+        {
+            Id aId = new() { id = agentId };
+            if (_agentIdWiseSessionCache.TryGetValue(aId, out ComponentWiseCache componentWiseCache) && componentWiseCache != null)
+            {
+                return componentWiseCache.GetSession();
+            }
+            return (false, null);
+        }
+        public List<ComponentsTechnicalInfo> GetTechnicalInfo()
+        {
+            List<ComponentsTechnicalInfo> list = new();
+            for (int i = 0; i < _agentIdWiseSessionCache.Count; i++)
+            {
+                var info = _agentIdWiseSessionCache.ElementAt(i).Value;
+                if (info != null)
+                {
+                    list.AddRange(info.GetTechnicalInfo());
+                }
+            }
+            return list;
+        }
+        public (bool, ComponentsTechnicalInfo) GetTechnicalInfo(CompInitReq compInitReq)
+        {
+            Id sId = new() { id = compInitReq.AgentId };
+            if (_agentIdWiseSessionCache.TryGetValue(sId, out ComponentWiseCache componentWiseCache) && componentWiseCache != null)
+            {
+                return componentWiseCache.GetTechnicalInfo(compInitReq);
+            }
+            return (false, null);
+        }
+        public List<FileStatus> GetFileStatus()
+        {
+            if(_fileStatusDetails != null)
+            {
+                return _fileStatusDetails;
+            }
+            return new();
+        }
+        public List<ComponentStatus> GetComponentStatus()
+        {
+            if (_componentStatusDetails != null)
+            {
+                return _componentStatusDetails;
+            }
+            return new();
+        }
+        public void AddOrUpdate(CompInitReq compInitReq, bool flag)
+        {
+            Id agentId = new() { id = compInitReq.AgentId };
+            if (!_agentIdWiseSessionCache.TryGetValue(agentId, out ComponentWiseCache componentWiseCache))
+            {
+                componentWiseCache = new();
+                _agentIdWiseSessionCache.TryAdd(agentId, componentWiseCache);
+            }
+            componentWiseCache.AddOrUpdate(compInitReq,flag);
+        }
+        public (bool,List<Component>) GetComponentMaster()
+        {
+            List<Component> componentList = new();
+            if (_agentIdWiseSessionCache != null)
+            {
+                foreach(var componentwisecache in _agentIdWiseSessionCache.Values)
+                {
+                    if(componentwisecache!=null)
+                    {
+                        var resp = componentwisecache.GetComponentMaster();
+                        if (resp.Item1)
+                            componentList.AddRange(resp.Item2);
+
+                    }
+                };
+            }
+            return (true,componentList);
+        }
+        public (bool, List<FileMasterInfo>) GetFileMasterInfo()
+        {
+            if (_agentIdWiseSessionCache != null)
+            {
+                List<FileMasterInfo> fileList = new();
+                foreach (var _segmentWiseFillCache in _agentIdWiseSessionCache.Values)
+                {
+                    if (_segmentWiseFillCache != null)
+                    {
+                        var res = _segmentWiseFillCache.GetFileMasterInfo();
+                        if (res.Item1)
+                        {
+                            fileList.AddRange(res.Item2);
+                        }
+                    }
+                };
+                return (true, fileList);
+            }
+            return (false, new());
+        }
+        public void UpdateIsActiveFlag(CompInitReq componentMaster, bool flag)
+        {
+            Id agentId = new() { id = componentMaster.AgentId };
+            if (!_agentIdWiseSessionCache.TryGetValue(agentId, out ComponentWiseCache componentWiseCache))
+            {
+                componentWiseCache = new();
+                _agentIdWiseSessionCache.TryAdd(agentId, componentWiseCache);
+            }
+            componentWiseCache.UpdateIsActiveFlag(componentMaster,flag);
+        }
+        public void UpdateIsDeleteFlag(CompInitReq componentMaster, bool flag)
+        {
+            Id agentId = new() { id = componentMaster.AgentId };
+            if (!_agentIdWiseSessionCache.TryGetValue(agentId, out ComponentWiseCache componentWiseCache))
+            {
+                componentWiseCache = new();
+                _agentIdWiseSessionCache.TryAdd(agentId, componentWiseCache);
+            }
+            componentWiseCache.UpdateIsDeleteFlag(componentMaster, flag);
+        }
+    }
+
+    public class ComponentWiseCache
+    {
+        private AgentSessionInfo agentSessionInfo;
+        private ConcurrentDictionary<Id, InstanceWiseCache> _componentIdWiseSessionCache;
+        private ConcurrentDictionary<Id, FileTypeWiseFileCache> _segmentWiseFileCache;
+        public ComponentWiseCache()
+        {
+            agentSessionInfo = new();
+            _segmentWiseFileCache = new();
+            _componentIdWiseSessionCache = new();
+        }
+        public void AddOrUpdate(AgentSessionInfo agentSessionInfo1)
+        {
+            CacheUpdateHelper.UpdateObjectReference(agentSessionInfo1, agentSessionInfo);
+        }
+        public void AddOrUpdate(ComponentsTechnicalInfo agentFunctionalInfo)
+        {
+            Id componentId = new() { id = agentFunctionalInfo.ComponentId };
+            if (!_componentIdWiseSessionCache.TryGetValue(componentId, out InstanceWiseCache instanceWiseCache))
+            {
+                instanceWiseCache = new();
+                _componentIdWiseSessionCache.TryAdd(componentId, instanceWiseCache);
+            }
+            instanceWiseCache.AddOrUpdate(agentFunctionalInfo);
+        }
+        public void AddOrUpdate(ComponentMaster componentMaster)
+        {
+            Id componentId = new() { id = componentMaster.ComponentId };
+            if (!_componentIdWiseSessionCache.TryGetValue(componentId, out InstanceWiseCache instanceWiseCache))
+            {
+                instanceWiseCache = new();
+                _componentIdWiseSessionCache.TryAdd(componentId, instanceWiseCache);
+            }
+            instanceWiseCache.AddOrUpdate(componentMaster);
+        }
+        public void AddOrUpdate(FileMasterInfo fileMasterInfo)
+        {
+            Id segmentId = new() { id = fileMasterInfo.SegmentId };
+            if (!_segmentWiseFileCache.TryGetValue(segmentId, out FileTypeWiseFileCache fileTypeWiseFileCache))
+            {
+                fileTypeWiseFileCache = new();
+                _segmentWiseFileCache.TryAdd(segmentId, fileTypeWiseFileCache);
+            }
+            fileTypeWiseFileCache.AddOrUpdate(fileMasterInfo);
+        }
+        public void AddOrUpdate(ComponentStatus componentStatus)
+        {
+            Id componentId = new() { id = componentStatus.ComponentType };
+            if (_componentIdWiseSessionCache.TryGetValue(componentId, out InstanceWiseCache instanceWiseCache) && instanceWiseCache != null)
+            {
+                instanceWiseCache.AddOrUpdate(componentStatus);
+            }
+        }
+        public (bool, List<Component>) GetComponentMaster()
+        {
+            List<Component> componentMasters = new();
+            for(int i=0; i<_componentIdWiseSessionCache.Count; i++)
+            {
+                var data = _componentIdWiseSessionCache.ElementAt(i);
+                if(data.Value != null)
+                {
+                    componentMasters.AddRange(data.Value.GetComponentMaster());
+                }
+            }
+            return (true, componentMasters);
+        }
+        public (bool, List<FileMasterInfo>) GetFileMasterInfo()
+        {
+            List<FileMasterInfo> fileMaster = new();
+            for (int i = 0; i < _segmentWiseFileCache.Count; i++)
+            {
+                var data = _segmentWiseFileCache.ElementAt(i);
+                if (data.Value != null)
+                {
+                    fileMaster.AddRange(data.Value.GetFileMasterInfo());
+                }
+            }
+            return (true, fileMaster);
+        }
+        public (bool, ComponentMaster) GetComponentMaster(CompInitReq compInitReq)
+        {
+            Id cId = new() { id = compInitReq.CompId };
+            if (_componentIdWiseSessionCache.TryGetValue(cId, out InstanceWiseCache instanceWiseCache) && instanceWiseCache != null)
+            {
+                return instanceWiseCache.GetComponentMaster(compInitReq);
+            }
+            return (false, null);
+        }
+        public (bool, AgentSessionInfo) GetSession()
+        {
+            if(agentSessionInfo != null)
+            {
+                return (true, agentSessionInfo);
+            }
+            return (false, null);
+        }
+        public List<ComponentsTechnicalInfo> GetTechnicalInfo()
+        {
+            List<ComponentsTechnicalInfo> list = new();
+            for (int i = 0; i < _componentIdWiseSessionCache.Count; i++)
+            {
+                var info = _componentIdWiseSessionCache.ElementAt(i).Value;
+                if (info != null)
+                {
+                    var tecinfo = info.GetTechnicalInfo();
+                    list.AddRange(tecinfo);
+                }
+            }
+            return list;
+        }
+        public (bool, ComponentsTechnicalInfo) GetTechnicalInfo(CompInitReq compInitReq)
+        {
+            Id cId = new() { id = compInitReq.CompId };
+            if (_componentIdWiseSessionCache.TryGetValue(cId, out InstanceWiseCache instanceWiseCache) && instanceWiseCache != null)
+            {
+                return instanceWiseCache.GetTechnicalInfo(compInitReq);
+            }
+            return (false, null);
+        }
+        public void AddOrUpdate(CompInitReq compInitReq, bool flag)
+        {
+            Id componentId = new() { id = compInitReq.CompId };
+            if (!_componentIdWiseSessionCache.TryGetValue(componentId, out InstanceWiseCache instanceWiseCache))
+            {
+                instanceWiseCache = new();
+                _componentIdWiseSessionCache.TryAdd(componentId, instanceWiseCache);
+            }
+            instanceWiseCache.AddOrUpdate(compInitReq,flag);
+        }
+        public void UpdateIsActiveFlag(CompInitReq componentMaster, bool flag)
+        {
+            Id componentId = new() { id = componentMaster.CompId };
+            if (!_componentIdWiseSessionCache.TryGetValue(componentId, out InstanceWiseCache instanceWiseCache))
+            {
+                instanceWiseCache = new();
+                _componentIdWiseSessionCache.TryAdd(componentId, instanceWiseCache);
+            }
+            instanceWiseCache.UpdateIsActiveFlag(componentMaster,flag);
+        }
+        public void UpdateIsDeleteFlag(CompInitReq componentMaster, bool flag)
+        {
+            Id componentId = new() { id = componentMaster.CompId };
+            if (!_componentIdWiseSessionCache.TryGetValue(componentId, out InstanceWiseCache instanceWiseCache))
+            {
+                instanceWiseCache = new();
+                _componentIdWiseSessionCache.TryAdd(componentId, instanceWiseCache);
+            }
+            instanceWiseCache.UpdateIsDeleteFlag(componentMaster, flag);
+        }
+
+    }
+
+    public class InstanceWiseCache
+    {
+        private ConcurrentDictionary<Id, Component> _instanceIdWiseSessionCache;
+        public InstanceWiseCache()
+        {
+            _instanceIdWiseSessionCache = new();
+        }
+        public void AddOrUpdate(ComponentsTechnicalInfo agentFunctionalInfo)
+        {
+            Id instanceId = new() { id = agentFunctionalInfo.InstanceId };
+            if (!_instanceIdWiseSessionCache.TryGetValue(instanceId, out Component component))
+            {
+                component = new()
+                {
+                    componentsTechnicalInfo = new(),
+                    componentMaster = new()
+                };
+                _instanceIdWiseSessionCache.TryAdd(instanceId, component);
+            }
+
+            //sets High CPU Utilization
+            if(component.componentsTechnicalInfo.CPUHigh == 0)
+            {
+                agentFunctionalInfo.CPUHigh = agentFunctionalInfo.CPUUtilization;
+            }
+            else if(component.componentsTechnicalInfo.CPUHigh < agentFunctionalInfo.CPUUtilization)
+            {
+                agentFunctionalInfo.CPUHigh = agentFunctionalInfo.CPUUtilization;
+            }
+
+            //sets Low CPU Utilization
+            if (component.componentsTechnicalInfo.CPULow == 0)
+            {
+                agentFunctionalInfo.CPULow = agentFunctionalInfo.CPUUtilization;
+            }
+            else if (component.componentsTechnicalInfo.CPULow > agentFunctionalInfo.CPUUtilization)
+            {
+                agentFunctionalInfo.CPULow = agentFunctionalInfo.CPUUtilization;
+            }
+
+            //sets High RAM Utilization
+            if (component.componentsTechnicalInfo.RAMHigh == 0)
+            {
+                agentFunctionalInfo.RAMHigh = agentFunctionalInfo.RAMUtilization;
+            }
+            else if (component.componentsTechnicalInfo.RAMHigh < agentFunctionalInfo.RAMUtilization)
+            {
+                agentFunctionalInfo.RAMHigh = agentFunctionalInfo.RAMUtilization;
+            }
+            else
+            {
+                agentFunctionalInfo.RAMHigh = component.componentsTechnicalInfo.RAMHigh;
+            }
+
+            //sets Low RAM Utilization
+            if (component.componentsTechnicalInfo.RAMLow == 0)
+            {
+                agentFunctionalInfo.RAMLow = agentFunctionalInfo.RAMUtilization;
+            }
+            else if (component.componentsTechnicalInfo.RAMLow > agentFunctionalInfo.RAMUtilization)
+            {
+                agentFunctionalInfo.RAMLow = agentFunctionalInfo.RAMUtilization;
+            }
+            else
+            {
+                agentFunctionalInfo.RAMLow = component.componentsTechnicalInfo.RAMLow;
+            }
+
+            CacheUpdateHelper.UpdateObjectReference(agentFunctionalInfo, component.componentsTechnicalInfo);
+        }
+        public void AddOrUpdate(ComponentMaster componentMaster)
+        {
+            Id instanceId = new() { id = componentMaster.InstanceId };
+            if (!_instanceIdWiseSessionCache.TryGetValue(instanceId, out Component component))
+            {
+                component = new()
+                {
+                    componentsTechnicalInfo = new(),
+                    componentMaster = new()
+                };
+                _instanceIdWiseSessionCache.TryAdd(instanceId, component);
+            }
+            CacheUpdateHelper.UpdateObjectReference(componentMaster, component.componentMaster);
+        }
+        public void AddOrUpdate(ComponentStatus componentStatus)
+        {
+            Id instanceId = new() { id = componentStatus.InstanceId };
+            if (_instanceIdWiseSessionCache.TryGetValue(instanceId, out Component component) && component != null)
+            {
+                component.status = componentStatus.ComponentState;
+            }
+        }
+        public List<Component> GetComponentMaster()
+        {
+            List<Component> componentMasters = new();
+            for(int i=0; i<_instanceIdWiseSessionCache.Count; i++)
+            {
+                var data = _instanceIdWiseSessionCache.ElementAt(i);
+                if(data.Value != null && data.Value.componentMaster != null && data.Value.componentMaster.IsActive==true && data.Value.componentMaster.IsDelete == false)
+                {
+                    componentMasters.Add(data.Value);
+                }
+            }
+            return componentMasters;
+        }
+        public (bool, ComponentMaster) GetComponentMaster(CompInitReq compInitReq)
+        {
+            Id cId = new() { id = compInitReq.InstanceId };
+            if (_instanceIdWiseSessionCache.TryGetValue(cId, out Component component) && component != null)
+            {
+                if(component.componentMaster != null)
+                {
+                    return (true, component.componentMaster);
+                }
+            }
+            return (false, null);
+        }
+        public List<ComponentsTechnicalInfo> GetTechnicalInfo()
+        {
+            List<ComponentsTechnicalInfo> list = new();
+            for (int i = 0; i < _instanceIdWiseSessionCache.Count; i++)
+            {
+                var info = _instanceIdWiseSessionCache.ElementAt(i).Value;
+                if (info != null)
+                {
+                    if(info.componentsTechnicalInfo != null && info.componentsTechnicalInfo.InstanceId != 0 && info.componentsTechnicalInfo.ComponentId !=0)
+                    {
+                        list.Add(info.componentsTechnicalInfo);
+                    }
+                }
+            }
+            return list;
+        }
+        public (bool, ComponentsTechnicalInfo) GetTechnicalInfo(CompInitReq compInitReq)
+        {
+            Id cId = new() { id = compInitReq.InstanceId };
+            if (_instanceIdWiseSessionCache.TryGetValue(cId, out Component component) && component != null)
+            {
+                if (component.componentMaster != null)
+                {
+                    return (true, component.componentsTechnicalInfo);
+                }
+            }
+            return (false, null);
+        }
+        public void AddOrUpdate(CompInitReq compInitReq, bool flag)
+        {
+            Id instanceId = new() { id = compInitReq.InstanceId };
+            if (!_instanceIdWiseSessionCache.TryGetValue(instanceId, out Component component))
+            {
+                component = new()
+                {
+                    componentsTechnicalInfo = new(),
+                    componentMaster = new(),
+                    isRequestSend= flag,
+                };
+                _instanceIdWiseSessionCache.TryAdd(instanceId, component);
+            }
+            component.isRequestSend= flag;
+        }
+        public void UpdateIsActiveFlag(CompInitReq componentMaster, bool flag)
+        {
+            Id instanceId = new() { id = componentMaster.InstanceId };
+            if (_instanceIdWiseSessionCache.TryGetValue(instanceId, out Component component))
+            {
+                if(component.componentMaster!=null)
+                {
+                    component.componentMaster.IsActive = flag;
+                }
+               
+                //_instanceIdWiseSessionCache.TryAdd(instanceId, component);
+            }
+        }
+        public void UpdateIsDeleteFlag(CompInitReq componentMaster, bool flag)
+        {
+            Id instanceId = new() { id = componentMaster.InstanceId };
+            if (_instanceIdWiseSessionCache.TryGetValue(instanceId, out Component component))
+            {
+                if (component.componentMaster != null)
+                {
+                    component.componentMaster.IsDelete = flag;
+                }
+
+               // _instanceIdWiseSessionCache.TryAdd(instanceId, component);
+            }
+        }
+
+    }
+
+    public class FileTypeWiseFileCache
+    {
+        private ConcurrentDictionary<Id, FileMasterInfo> _fileTypeWiseFileCache;
+        public FileTypeWiseFileCache()
+        {
+            _fileTypeWiseFileCache = new();
+        }
+        public void AddOrUpdate(FileMasterInfo fileMasterInfo)
+        {
+            Id fileId = new() { id = fileMasterInfo.FileType };
+            if (!_fileTypeWiseFileCache.TryGetValue(fileId, out FileMasterInfo fileInfo))
+            {
+                fileInfo = new();
+                _fileTypeWiseFileCache.TryAdd(fileId, fileInfo);
+            }
+            CacheUpdateHelper.UpdateObjectReference(fileMasterInfo, fileInfo);
+        }
+        public List<FileMasterInfo> GetFileMasterInfo()
+        {
+            List<FileMasterInfo> fileMaster = new();
+            for (int i = 0; i < _fileTypeWiseFileCache.Count; i++)
+            {
+                var data = _fileTypeWiseFileCache.ElementAt(i);
+                if (data.Value != null && data.Value != null)
+                {
+                    fileMaster.Add(data.Value);
+                }
+            }
+            return fileMaster;
+        }
+    }
+
+    public class AgentSessionInfo
+    {
+        public int BrokerId;
+        public int SiteId;
+        public int AgentId;
+        public string IP;
+        public string AgentName;
+        public SocketSession Session;
+        public bool IsConnected;
+    }
+
+    public class Component
+    {
+        public int status;
+        public bool isRequestSend;
+        public bool isenabled;
+        public ComponentMaster componentMaster;
+        public ComponentsTechnicalInfo componentsTechnicalInfo;
+    }
+
+    public class ComponentMaster
+    {
+        public int BrokerId;
+        public int SiteId;
+        public int AgentId;
+        public int ComponentId;
+        public string AgentName;
+        public string ComponentName;
+        public int InstanceId;
+        public string ExePath;
+        public string CmdParam;
+        public bool IsRunAsService;
+        public string ServiceName;
+        public int Priority;
+        public double CpuThresholdLimit;
+        public double RamThresholdLimit;
+        public bool IsActive=true;
+        public bool IsDelete=false;
+    }
+
+    public class ComponentsTechnicalInfo
+    {
+        public int BrokerId;
+        public int SiteId;
+        public int AgentId;
+        public string AgentName;
+        public string ComponentName;
+        public int ComponentId;
+        public int InstanceId;
+        public double RAMUtilization;
+        public double CPUUtilization;
+        public double CPUHigh;
+        public double CPULow;
+        public double RAMHigh;
+        public double RAMLow;
+        public string Timestamp;
+    }
+
+    public class FileMasterInfo
+    {
+        public int BrokerId;
+        public int SiteId;
+        public int AgentId;
+        public int SegmentId;
+        public int FileType;
+        public string FileName;
+        public int Priority;
+        public string DestinationPath;
+        public bool IsUploadBeforeBOD;
+    }
+}
+
+
+
+using Microsoft.AspNetCore.Mvc.ModelBinding;
+using System.ComponentModel.DataAnnotations;
+
+namespace LoginSignupCore.Models
+{
+    public partial class AgentMaster
+    {
+        public int AgentId { get; set; }
+        [Required(ErrorMessage="AgentName required")]
+        public string AgentName { get; set; }
+        public string? SiteName { get; set; }
+        public int BrokerId { get; set; }
+        public int BrokerSiteId { get; set; }
+        [Required(ErrorMessage = "nvcInstanceIP required")]
+        public string nvcInstanceIP { get; set; }
+        public int IsActive { get; set; }
+
+        public int IsDeleted { get; set; }
+
+        public int IntCreatedBy { get; set; }
+
+        public DateTime? DtmCreationDate { get; set; }
+
+        public int? IntUpdatedBy { get; set; }
+
+        public DateTime? DtmUpdationDate { get; set; }
+        public string Remarks { get; set; } 
+    }
+}
+
+
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace LoginSignupCore.Models;
+
+public partial class ComponentMaster
+{
+    public int Id { get; set; }
+
+    public int IntComponentId { get; set; }
+
+    [Required(ErrorMessage = "Please Component Name")]
+    public string NvcComponentName { get; set; }
+    [Required(ErrorMessage = "Please CpuThreshold required")]
+    public double CpuThreshold { get; set; }
+
+    [Required(ErrorMessage = "please RamThreshold required")]
+    public double RamThreshold { get; set; }
+    [Range(1,int.MaxValue,ErrorMessage = "Please set Priority | Can't be zero")]
+    public int IntPriority { get; set; }
+    public DateTime DtmCreatedOn { get; set; }
+
+    public int? IntCreatedBy { get; set; }
+
+    public DateTime? DtmUpdatedOn { get; set; }
+
+    public int? IntUpdatedBy { get; set; }
+
+    public int BitIsActive { get; set; }
+
+    public int BitIsDelete { get; set; }
+    
+    public List<ComponentMaster> Components = new List<ComponentMaster>();
+}
+
