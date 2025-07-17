@@ -2293,3 +2293,173 @@ public partial class ComponentMaster
     public List<ComponentMaster> Components = new List<ComponentMaster>();
 }
 
+
+
+
+
+
+@model AgentMastersViewModel
+
+
+<div class="cstm_heading">
+    <h1>
+       @*  <a asp-controller="brokermaster" asp-action="displaydata">
+           <button type="button" class="action-btn">
+            <i class="bi bi-arrow-bar-left"></i>
+            </button>
+        </a>  *@
+        <a href="/BrokerSite/BrokerSites">
+            <i class="bi bi-arrow-bar-left"></i>
+        </a>
+
+        Agents</h1>
+    @* <a class="add_btn" asp-action="file" asp-controller="filemaster"> *@
+        <div>
+        <a class="add_btn" id="showAddView">
+            <i class="bi bi-plus-square"></i>
+            Add New Agent
+        </a>
+        
+        </div>
+   
+</div>
+
+
+@* <div id="FormView" class="viewPanel" style="display:none"></div>*@
+
+@{
+    if (Model.Agent.AgentId != 0)
+    {
+        <div id="FormView" class="viewPanel" style="display:block"></div>
+    }
+    else
+    {
+        <div id="FormView" class="viewPanel" style="display:none"></div>
+    }
+}
+
+
+<div>
+
+
+    <div class="table-responsive cstm_tbl">
+        <table class="table dataTable">
+            <thead>
+                <tr>
+                    @* <th> Id </th> *@
+                    <th> Agent Name </th>
+                    <th> Instance IP </th>
+                    <th> Active </th>
+                    <th> Action </th>
+                    <th> Components </th>
+                    <th> Files </th>
+                </tr>
+            </thead>
+            @if (Model != null)
+            {
+
+
+                @foreach (var AgentModel in Model.Agents)
+                {
+                    <form id="formsites" asp-controller="AgentMaster" asp-action="Edit" method="post">
+                    <tr>
+                        @* <td> @AgentModel.AgentId </td> *@
+                        <td> @AgentModel.AgentName </td>
+                        <td> @AgentModel.nvcInstanceIP </td>
+                        
+
+                            @if (AgentModel.IsActive == 1)
+                            {
+
+                            <td>
+                                <input id="AgentId" name="AgentId" type="hidden" value="@AgentModel.AgentId" />
+                                <input id="AgentName" name="AgentName" type="hidden" value="@AgentModel.AgentName" />
+                                <input id="BrokerId" name="BrokerId" type="hidden" value="@AgentModel.BrokerId" />
+                                <input id="BrokerSiteId" name="BrokerSiteId" type="hidden" value="@AgentModel.BrokerSiteId" />
+                                <input id="IsActive" name="IsActive" type="hidden" value=0 />
+                                <button type="submit" asp-controller="AgentMaster" asp-action="Edit" onclick="getConfirmationlocal();" class="btn btn-success activ_btn" title="Active">Deactivate</button>
+                            </td>
+                            }
+                            else
+                            {
+
+
+                            <td>
+                                <input id="AgentId" name="AgentId" type="hidden" value="@AgentModel.AgentId" />
+                                <input id="AgentName" name="AgentName" type="hidden" value="@AgentModel.AgentName" />
+                                <input id="BrokerId" name="BrokerId" type="hidden" value="@AgentModel.BrokerId" />
+                                <input id="BrokerSiteId" name="BrokerSiteId" type="hidden" value="@AgentModel.BrokerSiteId" />
+                                <input id="IsActive" name="IsActive" type="hidden" value=1 />
+                                <button type="submit" asp-controller="AgentMaster" asp-action="Edit" onclick="getConfirmationlocal();" class="btn btn-warning activ_btn" title="DeActive">Activate</button>
+                            </td>
+                            }
+                        <td class="action_td">
+                            <input type="hidden" name="AgentId"    value="@AgentModel.AgentId" />
+                            <input type="hidden" name="AgentName"  value="@AgentModel.AgentName" />
+                            <input type="hidden" name="BrokerId"   value="@AgentModel.BrokerId" />
+                            <input type="hidden" name="BrokerSiteId" value="@AgentModel.BrokerSiteId" />
+                            <input type="hidden" name="SiteName" value="@Model.Agent.SiteName" />
+                            <input type="hidden" name="IsActive" value="@AgentModel.IsActive" />
+                            <button type="submit" class="edit_action" title ="update Agents" asp-controller="AgentMaster" asp-action="AgentMasters">
+                                <i class="bi bi-pencil-square"></i>
+                            </button>
+ 
+                           
+
+                            <a title="Delete Agent" asp-controller="AgentMaster" asp-action="Delete" asp-route-id="@AgentModel.AgentId" asp-route-bid="@AgentModel.BrokerId" asp-route-sid="@AgentModel.BrokerSiteId" asp-route-sitename="@Model.Agent.SiteName">
+                                <i class="bi bi-archive"></i>
+                            </a>
+                        </td>
+                        <td class="">
+
+                            <a class="nav-link" href="@Url.Action("ComponentsMaster","ComponentAssign",new {agentId=@AgentModel.AgentId,brokerid=@AgentModel.BrokerId,siteid=@AgentModel.BrokerSiteId})">
+                                <button type="button" class="action-btn" title="View Components"><i class="bi bi-view-list"></i></button>
+                            </a> 
+                        </td>
+                        <td>
+                            <a class="nav-link" href="@Url.Action("AgentWiseFileMaster","AgentwiseFiles",new {agentId=@AgentModel.AgentId,brokerid=@AgentModel.BrokerId,siteid=@AgentModel.BrokerSiteId})">
+                                <button type="button" class="action-btn" title="View Files"><i class="bi bi-file-earmark-diff"></i></button>
+                            </a>
+
+                        </td>
+                        
+                    </tr>
+                    </form>
+                }
+            }
+        </table>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    $(document).ready(function () {
+        //alert("test");
+        debugger
+        $.ajax({
+            url: '@Url.Action("AgentFile","AgentMaster",new { id = Model.Agent.AgentId,brid=Model.Agent.BrokerId,sid=Model.Agent.BrokerSiteId,sitename=Model.Agent.SiteName})',
+
+            type: 'GET',
+            success: function (result) {
+                $('#FormView').html(result);
+            }
+        });
+
+
+    });
+    function getConfirmationlocal() {
+
+        if (!confirm('Do you want to save the changes..?')) {
+            return false;
+        }
+        else {
+            document.getElementById("formsites").submit();
+        }
+    }
+</script>
+
+
+
+
+
+
