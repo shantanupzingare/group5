@@ -1,0 +1,1103 @@
+using BinaryProtocol.Common;
+using LoginSignupCore.Core;
+
+namespace LoginSignupCore.Global
+{
+    internal class Log
+    {
+        private static LogType _logType;
+        internal Log(LogType logType)
+        {
+            _logType = logType;
+        }
+
+        internal void UpdateLogType(LogType logType)
+        {
+            _logType = logType;
+        }
+
+        internal static void Verbose(object Object, string message = "")
+        {
+            if (_logType > LogType.Verbose)
+            {
+                Object = null;
+                message = null;
+                return;
+            }
+            LogObject logObject = new LogObject(LogType.Verbose, message, Object);
+            CoreProcess.SendToLogQueue(logObject);
+        }
+
+        internal static void Debug(object Object, string message = "")
+        {
+            if (_logType > LogType.Debug)
+            {
+                Object = null;
+                message = null;
+                return;
+            }
+            LogObject logObject = new LogObject(LogType.Debug, message, Object);
+            CoreProcess.SendToLogQueue(logObject);
+        }
+        internal static void Info(string message = "")
+        {
+            if (_logType > LogType.Info)
+            {
+                message = null;
+                return;
+            }
+
+            LogObject logObject = new LogObject(LogType.Info, message);
+            CoreProcess.SendToLogQueue(logObject);
+        }
+        internal static void Warning(object Object, string message = "")
+        {
+            if (_logType > LogType.Warning)
+            {
+                Object = null;
+                message = null;
+                return;
+            }
+            LogObject logObject = new LogObject(LogType.Warning, message, Object);
+            CoreProcess.SendToLogQueue(logObject);
+        }
+        internal static void Error(object Object, string message = "")
+        {
+            if (_logType > LogType.Error)
+            {
+                Object = null;
+                message = null;
+                return;
+            }
+            LogObject logObject = new LogObject(LogType.Error, message, Object);
+            CoreProcess.SendToLogQueue(logObject);
+        }
+
+        internal static void Fatal(object Object, string message = "")
+        {
+            if (_logType > LogType.Fatal)
+            {
+                Object = null;
+                message = null;
+                return;
+            }
+            LogObject logObject = new LogObject(LogType.Error, message, Object);
+            CoreProcess.SendToLogQueue(logObject);
+        }
+    }
+}
+
+
+
+using BinaryProtocol.Common;
+using Exchange.Logs;
+using LoginSignupCore.Core;
+using Serilog.Events;
+using System.Text;
+using Utility.Queueing;
+
+namespace LoginSignupCore.Processor
+
+{
+    public class LogProcessor
+    {
+        private ProcessQueue<LogObject> logQueue;
+        private Thread thread;
+        private LogManager logManager;
+        private StringBuilder logMsg;
+        public LogProcessor(LogConfiguration logConfiguration)
+        {
+            logMsg = new StringBuilder();
+            logManager = new LogManager(logConfiguration);
+            logQueue = new ProcessQueue<LogObject>();
+            thread = new Thread(new ThreadStart(ListenQueue));
+            thread.Start();
+        }
+        public Response Enqueue(LogObject data)
+        {
+            return logQueue.Enqueue(data);
+        }
+        private void ListenQueue()
+        {
+            while (true)
+            {
+                if (logQueue.TryDequeue(out LogObject data))
+                {
+                    LogDataProcess(data);
+                }
+                data.Object = null;
+                data.Message = null;
+            }
+
+        }
+
+        private void LogDataProcess(LogObject data)
+        {
+            LogObject logObject = data;
+
+            logMsg.Clear();
+            logMsg.Append("Msg: " + data.Message);
+
+            if (logObject.Object != null)
+            {
+                logMsg.Append(", Object: " + Helper.SerializeObject(logObject.Object));
+            }
+
+            try
+            {
+                switch (logObject.LogType)
+                {
+                    case LogType.Verbose:
+                        logManager.Verbose(logMsg.ToString());
+                        break;
+                    case LogType.Debug:
+                        logManager.Debug(logMsg.ToString());
+                        break;
+                    case LogType.Error:
+                        logManager.Error(logMsg.ToString());
+                        break;
+                    case LogType.Info:
+                        logManager.Info(logMsg.ToString());
+                        break;
+                    case LogType.Warning:
+                        logManager.Warning(logMsg.ToString());
+                        break;
+                    case LogType.Fatal:
+                        logManager.Error(logMsg.ToString());
+                        break;
+                    default:
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                logManager.Error(ex, "Msg: Error in log, Object: ");
+            }
+            finally
+            {
+                logObject.Message = null;
+                logObject.Object = null;
+                logMsg.Clear();
+            }
+        }
+
+        public void ChangeLogType(LogEventLevel loglevel)
+        {
+            logManager.ChangeLogLevel(loglevel);
+        }
+    }
+}
+
+
+
+using Serilog;
+using Serilog.Core;
+using Serilog.Events;
+using System;
+
+namespace Exchange.Logs
+{
+    public class LogManager
+    {
+        private Logger logger;
+        private LoggingLevelSwitch loggingLevelSwitch;
+        public LogManager(string logFilePath)
+        {
+            logger = new LoggerConfiguration().MinimumLevel.Verbose()
+                   .WriteTo.Async(a => a.File(logFilePath,
+                   rollOnFileSizeLimit: true,
+                   fileSizeLimitBytes: 20971520,
+                   rollingInterval: RollingInterval.Day,
+                   outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u5}] {Message:lj}{NewLine}{Exception}"))
+                   .CreateLogger();
+        }
+
+        public LogManager(LogConfiguration logConfiguration)
+        {
+            loggingLevelSwitch = logConfiguration.LoggingLevelSwitch;
+
+            logger = new LoggerConfiguration().MinimumLevel.ControlledBy(loggingLevelSwitch)
+                   .WriteTo.Async(a => a.File(logConfiguration.LogFileNameWithPath,
+                                              rollOnFileSizeLimit: logConfiguration.RollOnFileSizeLimit,
+                                              fileSizeLimitBytes: logConfiguration.FilesizeLimitBytes,
+                                              rollingInterval: logConfiguration.RollingInterval,
+                                              outputTemplate: logConfiguration.OutputTemplate,
+                                              retainedFileCountLimit: (logConfiguration.RetainedFileCount > 0) ? logConfiguration.RetainedFileCount : (int?)null))
+                   .CreateLogger();
+        }
+
+        public LogManager(LogConfiguration logConfiguration, LogEventLevel explicitLogEventLevel, string explicitFileName)
+        {
+            loggingLevelSwitch = logConfiguration.LoggingLevelSwitch;
+
+            logger = new LoggerConfiguration()
+                   .MinimumLevel.ControlledBy(loggingLevelSwitch)
+                   .WriteTo.Logger(l => l.Filter.ByIncludingOnly(e => e.Level == explicitLogEventLevel).WriteTo.Async(a => a.File(path: explicitFileName,
+                                                                                                                                  rollOnFileSizeLimit: logConfiguration.RollOnFileSizeLimit,
+                                                                                                                                  fileSizeLimitBytes: logConfiguration.FilesizeLimitBytes,
+                                                                                                                                  rollingInterval: logConfiguration.RollingInterval,
+                                                                                                                                  outputTemplate: logConfiguration.OutputTemplate,
+                                                                                                                                  retainedFileCountLimit: (logConfiguration.RetainedFileCount > 0) ? logConfiguration.RetainedFileCount : (int?)null)))
+                   .WriteTo.Logger(l => l.Filter.ByIncludingOnly(e => e.Level != explicitLogEventLevel).WriteTo.Async(a => a.File(path: logConfiguration.LogFileNameWithPath,
+                                                                                                                                  rollOnFileSizeLimit: logConfiguration.RollOnFileSizeLimit,
+                                                                                                                                  fileSizeLimitBytes: logConfiguration.FilesizeLimitBytes,
+                                                                                                                                  rollingInterval: logConfiguration.RollingInterval,
+                                                                                                                                  outputTemplate: logConfiguration.OutputTemplate,
+                                                                                                                                  retainedFileCountLimit: (logConfiguration.RetainedFileCount > 0) ? logConfiguration.RetainedFileCount : (int?)null)))
+                   .CreateLogger();
+
+        }
+
+        public void ChangeLogLevel(LogEventLevel _logLevelEvent)
+        {
+            loggingLevelSwitch.MinimumLevel = _logLevelEvent;
+        }
+
+
+        public void Verbose(string message)
+        {
+            logger.Verbose(message);
+        }
+        public void Verbose<T>(string message, T propertyValue)
+        {
+            logger.Verbose<T>(message, propertyValue);
+        }
+        public void Verbose(string message, params object[] propertyValues)
+        {
+            logger.Verbose(message, propertyValues);
+        }
+        public void Debug(string message)
+        {
+            logger.Debug(message);
+        }
+        public void Debug<T>(string message, T propertyValue)
+        {
+            logger.Debug<T>(message, propertyValue);
+        }
+        public void Debug(string message, params object[] propertyValues)
+        {
+            logger.Debug(message, propertyValues);
+        }
+        public void Error(string errorMessage)
+        {
+            logger.Error(errorMessage);
+        }
+        public void Error<T>(string errorMessage, T propertyValue)
+        {
+            logger.Error<T>(errorMessage, propertyValue);
+        }
+        public void Error(string errorMessage, params object[] propertyValues)
+        {
+            logger.Error(errorMessage, propertyValues);
+        }
+        public void Error(Exception exception, string errorMessage)
+        {
+            logger.Error(errorMessage, exception);
+        }
+        public void Info(string infoMessage)
+        {
+            logger.Information(infoMessage);
+        }
+        public void Info<T>(string infoMessage, T propertyValue)
+        {
+            logger.Information<T>(infoMessage, propertyValue);
+        }
+        public void Info(string infoMessage, params object[] propertyValues)
+        {
+            logger.Information(infoMessage, propertyValues);
+        }
+        public void Warning(string infoMessage)
+        {
+            logger.Warning(infoMessage);
+        }
+        public void Warning<T>(string infoMessage, T propertyValue)
+        {
+            logger.Warning<T>(infoMessage, propertyValue);
+        }
+        public void Warning(string infoMessage, params object[] propertyValues)
+        {
+            logger.Warning(infoMessage, propertyValues);
+        }
+
+
+        public void Fatal(string infoMessage)
+        {
+            logger.Fatal(infoMessage);
+        }
+        public void Fatal<T>(string infoMessage, T propertyValue)
+        {
+            logger.Fatal<T>(infoMessage, propertyValue);
+        }
+        public void Fatal(string infoMessage, params object[] propertyValues)
+        {
+            logger.Fatal(infoMessage, propertyValues);
+        }
+
+        public void Error(string v, object p)
+        {
+            logger.Error(v, p);
+        }
+        
+        public bool IsEnabled(LogEventLevel logEventLevel)
+        {
+            return logger.IsEnabled(logEventLevel);
+        }
+    }
+
+    public class LogConfiguration
+    {
+        public string LogFileNameWithPath;
+        public bool RollOnFileSizeLimit;
+        public long FilesizeLimitBytes;
+        public RollingInterval RollingInterval;
+        public string OutputTemplate;
+        public LoggingLevelSwitch LoggingLevelSwitch;
+        public int RetainedFileCount;
+    }
+
+
+}
+
+
+
+using BinaryProtocol.Common;
+using CTCL.BinaryProtocol.Common.CTCL.Common;
+using CTCL.CacheManagement.Helper;
+using System.Collections.Concurrent;
+
+namespace CTCL.CacheManagement.Models.Masters
+{
+    public class ComponentWiseConfigMasterCache
+    {
+        private ConcurrentDictionary<ComponentType, ConfigIdWiseCache> _componentWiseCache;
+        public ComponentWiseConfigMasterCache()
+        {
+            _componentWiseCache = new();
+        }
+        public void AddOrUpdate(CTCL_Configuration configuration, ComponentType componentType)
+        {
+            if (!_componentWiseCache.TryGetValue(componentType, out ConfigIdWiseCache configIdWiseCache))
+            {
+                configIdWiseCache = new();
+                _componentWiseCache.TryAdd(componentType, configIdWiseCache);
+            }
+            configIdWiseCache.AddOrUpdate(configuration);
+        }
+        public int GetCount(ComponentType componentType)
+        {
+            if (_componentWiseCache.TryGetValue(componentType, out ConfigIdWiseCache configIdWiseCache))
+            {
+                return configIdWiseCache.GetCount();
+            }
+            return 0;
+        }
+        public List<CTCL_Configuration> Get(ComponentType componentType)
+        {
+            if (_componentWiseCache.TryGetValue(componentType, out ConfigIdWiseCache configIdWiseCache))
+            {
+                return configIdWiseCache.Get();
+            }
+            return new List<CTCL_Configuration>();
+        }
+    }
+
+    public class ConfigIdWiseCache
+    {
+        private ConcurrentDictionary<CTCL_Id, CTCL_Configuration> _configIdWiseCache;
+        public ConfigIdWiseCache()
+        {
+            _configIdWiseCache = new();
+        }
+        public void AddOrUpdate(CTCL_Configuration configuration)
+        {
+            if (!_configIdWiseCache.TryGetValue(configuration.ConfigId, out CTCL_Configuration configuration1))
+            {
+                configuration1 = new();
+                _configIdWiseCache.TryAdd(configuration.ConfigId, configuration1);
+            }
+            CacheUpdateHelper.UpdateObjectReference(configuration, configuration1);
+        }
+        public int GetCount()
+        {
+            return _configIdWiseCache.Count;
+        }
+        public List<CTCL_Configuration> Get()
+        {
+            List<CTCL_Configuration> configList = new();
+            for (int i = 0; i < _configIdWiseCache.Count; i++)
+            {
+                var info = _configIdWiseCache.ElementAt(i).Value;
+                configList.Add(info);
+            }
+            return configList;
+        }
+    }
+}
+
+
+
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  },
+  "AllowedHosts": "*",
+  "ConnectionStrings": {
+    //"DBCTCL": "Data Source=10-100-1-57;Initial Catalog=CTCL;Integrated Security=SSPI;Persist Security Info=True;TrustServerCertificate=True;MultipleActiveResultSets=True"
+    "DBCTCL": "Data Source=10.100.1.57; Initial Catalog=CTCL; User Id=sa; Password=Sa@123; TrustServerCertificate=True"
+  },
+  "LogFile": "C:\\Logs\\AgentWorkerLogs\\AgentWorker.log",
+  "AgentIpAddress": "localhost",
+  "Port": 8888,
+  "PrefetchCount": 0,
+  "LogLevel": "0",
+  "LogFileCount": "1",
+  "ServerIP": "10.100.1.101",
+  "ServerPort": "5556",
+  "DBTimeOut": "180"
+}
+
+
+@model ComponentViewModel
+<div class="cstm_heading">
+    <h1 class="d-flex">
+   
+    <form id="formsites" asp-controller="AgentMaster" asp-action="AgentMasters" method="post">
+            <input type="hidden" id="BrokerSiteId" name="BrokerSiteId" value="@Model.Component.SiteId" />
+            <input type="hidden" id="SiteName" name="SiteName" value="@Model.Component.SiteId" />
+            <input type="hidden" id="BrokerId" name="BrokerId" value="@Model.Component.BrokerId" />
+
+
+            <button type="submit" class="action-btn">
+                <i class="bi bi-arrow-bar-left"></i>
+
+            </button>
+        </form>  Mapped Components for Agent @Model.Component.AgentName
+    </h1>
+    <a class="add_btn" id="showAddView">
+        <i class="bi bi-plus-square"></i>
+        Add Components
+    </a>
+  
+</div>
+
+@{
+    if (Model.Component.Id != 0)
+    {
+        <div id="FormView" class="viewPanel" style="display:block"></div>
+    }
+    else
+    {
+        <div id="FormView" class="viewPanel" style="display:none"></div>
+    }
+}
+ 
+
+<div class="table-reposnive cstm_tbl">
+    <table class="table dataTable " id="CompMaster">
+
+        @if (Model != null)
+        {
+
+            <thead>
+                <tr>
+                    @* <th> Id </th> *@
+                    <th> Component Name </th>
+                    <th> Active </th>
+                    <th> Action </th>
+                </tr>
+            </thead>
+            @foreach (var ComponentModel in Model.Components)
+            {
+                <form id="formsites" asp-controller="ComponentMaster" asp-action="Edit" method="post">
+                <tr>
+                    @* <td> @ComponentModel.Id </td> *@
+                    <td> @ComponentModel.ComponentName </td>
+                    <input id="mvalue" name="mvalue" type="hidden" value="@ComponentModel.IsActive" />
+
+                        @if (ComponentModel.IsActive == 1)
+                        {
+
+                        <td>
+                           @* <input asp-for-Id="@ComponentModel.Id" type="hidden" />
+                            <input id="AgentName" name="ComponentType" type="hidden" value="@ComponentModel.ComponentType" />
+                            <input id="BrokerId" name="AgentId" type="hidden" value="@ComponentModel.AgentId" />
+                            <input id="BrokerId" name="BrokerId" type="hidden" value="@Model.Component.BrokerId" />
+                            <input id="SiteId" name="SiteId" type="hidden" value="@Model.Component.SiteId" />
+                            <input id="SiteId" name="InstanceId" type="hidden" value="@ComponentModel.InstanceId" />
+                            <input id="IsActive" name="IsActive" type="hidden" value=0 />*@
+                            <a asp-controller="ComponentAssign" asp-action="Edit" asp-route-Id="@ComponentModel.Id"
+                   asp-route-ComponentType="@ComponentModel.ComponentType" asp-route-AgentId="@ComponentModel.AgentId" asp-route-BrokerId="@Model.Component.BrokerId"
+                   asp-route-SiteId="@Model.Component.SiteId" asp-route-InstanceId="@ComponentModel.InstanceId" asp-route-IsActive="0">
+                                <button type=" submit" class="btn btn-success activ_btn" title="Active">Deactivate</button>
+
+                            </a>
+                            
+                        </td>
+                        }
+                        else
+                        {
+
+                        <td>
+                         @*   <input id="Id" name="Id" type="hidden" value="@ComponentModel.Id" />
+                            <input id="AgentName" name="ComponentType" type="hidden" value="@ComponentModel.ComponentType" />
+                            <input id="AgentId" name="AgentId" type="hidden" value="@ComponentModel.AgentId" />
+                            <input id="BrokerId" name="BrokerId" type="hidden" value="@Model.Component.BrokerId" />
+                            <input id="SiteId" name="SiteId" type="hidden" value="@Model.Component.SiteId" />
+                            <input id="SiteId" name="InstanceId" type="hidden" value="@ComponentModel.InstanceId" />
+                            <input id="IsActive" name="IsActive" type="hidden" value=1 />
+                            <button type="submit" asp-controller="ComponentAssign" asp-action="Edit" class="btn btn-warning activ_btn" title="DeActive">Activate</button>*@
+                        
+                          <a asp-controller="ComponentAssign" asp-action="Edit" asp-route-Id="@ComponentModel.Id"
+                   asp-route-ComponentType="@ComponentModel.ComponentType" asp-route-AgentId="@ComponentModel.AgentId" asp-route-BrokerId="@Model.Component.BrokerId"
+                   asp-route-SiteId="@Model.Component.SiteId" asp-route-InstanceId="@ComponentModel.InstanceId" asp-route-IsActive= "1" >
+                                <button type=" submit" class="btn btn-warning activ_btn" title="DeActive">Activate</button>
+                        
+                        </a>
+                        </td>
+                        }
+                    <td class="action_td    ">
+                        <a title = "Update" asp-controller="ComponentAssign" asp-action="ComponentsMaster" class="action-btn" asp-route-agentId="@ComponentModel.AgentId" asp-route-brokerid=@Model.Component.BrokerId asp-route-siteid=@Model.Component.SiteId asp-route-id=@ComponentModel.Id>
+
+                            <i class="bi bi-pencil-square"></i>
+                        </a>
+                   
+                      @*  <input id="Id" name="Id" type="hidden" value="@ComponentModel.Id" />
+                        <input id="AgentName" name="ComponentType" type="hidden" value="@ComponentModel.ComponentType" />
+                        <input id="AgentId" name="AgentId" type="hidden" value="@ComponentModel.AgentId" />
+                        <input id="BrokerId" name="BrokerId" type="hidden" value="@Model.Component.BrokerId" />
+                        <input id="SiteId" name="SiteId" type="hidden" value="@Model.Component.SiteId" />
+                        <input id="SiteId" name="InstanceId" type="hidden" value="@ComponentModel.InstanceId" />
+                        <input id="IsActive" name="IsActive" type="hidden" value=1 />
+                        <button type="submit" class="action-btn" asp-controller="ComponentAssign" asp-action="Delete" onclick="getConfirmationlocal();" class="" title="Delete">
+                            <i class="bi bi-archive"></i>
+                        </button>*@
+                        <a asp-controller="ComponentAssign" asp-action="Delete" asp-route-Id="@ComponentModel.Id"
+                   asp-route-ComponentType="@ComponentModel.ComponentType" asp-route-AgentId="@ComponentModel.AgentId" asp-route-BrokerId="@Model.Component.BrokerId"
+                   asp-route-SiteId="@Model.Component.SiteId" asp-route-InstanceId="@ComponentModel.InstanceId" asp-route-IsActive="1">
+                            <button type=" submit" class="action-btn" title="Active"> <i class="bi bi-archive"></i></button>
+
+                        </a>
+                            @*<a asp-controller="ComponentAssign" asp-action="Delete" asp-route-id="@ComponentModel.Id" asp-route-aid="@ComponentModel.AgentId" asp-route-brokerid="@Model.Component.BrokerId" asp-route-siteid="@Model.Component.SiteId" asp-route-instid="@ComponentModel.InstanceId">Delete</a>*@
+                    </td>
+                        @*  <td style="padding-left:20px;padding-right:20px">
+            </td> *@
+                </tr>
+                </form>
+            }
+        }
+    </table>
+
+
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    $(document).ready(function () {
+        //alert("test");
+        $.ajax({
+            url: '@Url.Action("ComponentFile","ComponentAssign",new { agentId= Model.Component.AgentId,brokerid=Model.Component.BrokerId,siteid=Model.Component.SiteId,id = Model.Component.Id})',
+
+            type: 'GET',
+            success: function (result) {
+                $('#FormView').html(result);
+            }
+        });
+    });
+</script>
+<script>
+
+    window.onload = function () {
+        var tdata = @Html.Raw(Json.Serialize(TempData["ErrorMessage"] ??"null"));
+        if (tdata == "null") {
+            console.log("TempData is null");
+        } else {
+            swal.fire({
+                icon: 'error',
+                text: tdata
+            });
+        }
+    }
+</script>
+
+
+
+using LoginSignupCore.Core;
+using LoginSignupCore.Data;
+using LoginSignupCore.MasterCache;
+using LoginSignupCore.Models;
+using LoginSignupCore.Models.Request;
+using LoginSignupCore.Models.Response;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using System.ComponentModel;
+using System.Security.Claims;
+using System.Security.Policy;
+using Component = LoginSignupCore.Models.Component;
+
+namespace LoginSignupCore.Controllers
+{
+
+    public class ComponentAssignController: Controller
+    {
+        private readonly ComponentRepository componentRepository;
+        public ComponentAssignController()
+        {
+            componentRepository = new();
+        }
+        [HttpGet]
+        public IActionResult ComponentsMaster(int agentId, int brokerid,int siteid,int id=0)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            ComponentViewModel ComponentsView = new();
+            try
+            {
+                ComponentsView.Components = componentRepository.GetAllComponentAgentWise(agentId);
+                ComponentsView.Component = new();
+                ComponentsView.Component.AgentId = agentId;
+                ComponentsView.Component.BrokerId = brokerid;
+                ComponentsView.Component.SiteId = siteid;
+                ComponentsView.Component.Id = id;
+                ComponentsView.Component.AgentName = CoreProcess.agentSessionCache.GetSession(brokerid, siteid, agentId).Item2?.AgentName??string.Empty;
+
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
+            return View(ComponentsView);
+        }
+        [HttpPost]
+        public IActionResult Component(Component componentMaster)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            var component = new Component()
+            {
+                Id= componentMaster.Id,
+                BrokerId = componentMaster.BrokerId,
+                SiteId = componentMaster.SiteId,
+                AgentId= componentMaster.AgentId,
+                ComponentType= componentMaster.ComponentType,
+                ExePath= componentMaster.ExePath,
+                InstanceId = componentMaster.InstanceId,
+                CmdParam= string.IsNullOrEmpty(componentMaster.CmdParam) ?"": componentMaster.CmdParam,
+                IsRunAsService = componentMaster.IsRunAsService,
+                ServiceName = componentMaster.ServiceName,
+                Priority=componentMaster.Priority,
+                DtmCreationDate = DateTime.Now.Date,
+                IntCreatedBy = globals.User_ID,
+                Remarks = componentMaster.Remarks,
+                ComponentName = componentMaster.ComponentName,
+                AgentName = CoreProcess.agentSessionCache.GetSession(componentMaster.BrokerId, componentMaster.SiteId, componentMaster.AgentId).Item2?.AgentName??string.Empty
+            };
+            if (ModelState.IsValid)
+            {
+                try
+                {
+                    componentRepository.InsertAgentWiseComponentData(component);
+                }
+                catch (Exception ex)
+                {
+                    throw;
+                }
+             return RedirectToAction("ComponentsMaster", new { agentId = componentMaster.AgentId, brokerid = componentMaster.BrokerId, siteid = componentMaster.SiteId });
+
+            }
+            foreach (var item in ModelState.Values.SelectMany(v => v.Errors))
+            {
+                Console.WriteLine(item.ErrorMessage);
+            }
+            List<ComponentDropDown> list = componentRepository.GetComponentDropDowmList(component.AgentId);
+            if (list != null && list.Count > 0)
+                //ViewBag.ComponentDropDown = list;
+            componentMaster.com = list;
+             return RedirectToAction("Component", new { agentId = componentMaster.AgentId, brokerid = componentMaster.BrokerId, siteid = componentMaster.SiteId });
+            //return PartialView(component);
+        }
+       [HttpGet("ComponentAssign/ComponentFile/{agentId}/{brokerid}/{siteid}/{id?}")]
+        public IActionResult ComponentFile(int agentId, int brokerid, int siteid,int id=0)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            Component comp = new Component();
+            if (id != 0)
+            {
+                 comp = componentRepository.GetComponentById(id);
+                comp.BrokerId = brokerid;
+                comp.SiteId = siteid;
+                comp.AgentName =  CoreProcess.agentSessionCache.GetSession(brokerid,siteid,agentId).Item2?.AgentName??string.Empty;
+
+
+            }
+            else
+            {
+                 comp = new Component()
+                {
+                    Id = 0,
+                    AgentId = agentId,
+                    BrokerId = brokerid,
+                    SiteId= siteid
+                };
+            }
+
+            List<ComponentDropDown> list = componentRepository.GetComponentDropDowmList(agentId);
+            if (list != null && list.Count > 0)
+                comp.com = list;
+
+            return PartialView("Component", comp);
+            //return RedirectToAction("ComponentsMaster", new { agentId = comp.AgentId, brokerid = comp.BrokerId, siteid = comp.SiteId });
+        }
+       
+        public IActionResult Update(Component componentMaster)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            var component = new Component()
+            {
+                Id = componentMaster.Id,
+                AgentId = componentMaster.AgentId,
+                BrokerId=componentMaster.BrokerId,
+                SiteId=componentMaster.SiteId,
+                AgentName= componentMaster.AgentName,
+                ComponentName= componentMaster.ComponentName,
+                InstanceId=componentMaster.InstanceId,
+                ComponentType = componentMaster.ComponentType,
+                ExePath = componentMaster.ExePath,
+                CmdParam = componentMaster.CmdParam ?? string.Empty,
+                IsRunAsService = componentMaster.IsRunAsService,
+                ServiceName = componentMaster.ServiceName,
+                Priority = componentMaster.Priority,
+                DtmUpdationDate = DateTime.Now.Date,
+                IntUpdatedBy = globals.User_ID,
+                Remarks= componentMaster.Remarks,
+                
+            };
+            try
+            {
+                componentRepository.UpdateData(component);
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
+            return RedirectToAction("ComponentsMaster", new { agentId = componentMaster.AgentId, brokerid =componentMaster.BrokerId, siteid =componentMaster.SiteId });
+
+        }
+      
+        public IActionResult Delete(Component componentmaster)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            var component = new Component()
+            {
+                Id = componentmaster.Id,
+                AgentId = componentmaster.AgentId,
+                IsDeleted = 1,
+                DtmUpdationDate = DateTime.Now.Date,
+                IntUpdatedBy = globals.User_ID,
+                Remarks = "Deleted AgentwiseComponent",
+                BrokerId = componentmaster.BrokerId,
+                SiteId = componentmaster.SiteId
+                
+            };
+            try
+            {
+                componentRepository.UpdateIsDelete(component);
+                CompInitReq req = new CompInitReq()
+                {
+                    BrokerId = componentmaster.BrokerId,
+                    SiteId = componentmaster.SiteId,
+                    AgentId = componentmaster.AgentId,
+                    CompId = componentmaster.ComponentType,
+                    InstanceId = componentmaster.InstanceId
+                };
+                bool flag = true;
+                CoreProcess.agentSessionCache.UpdateIsDeleteFlag(req, flag);
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
+            return RedirectToAction("ComponentsMaster", new { agentId = component.AgentId, brokerid = component.BrokerId, siteid = component.SiteId });
+
+        }
+        public IActionResult Edit(Component componentMaster)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            var component = new Component()
+            {
+                Id = componentMaster.Id,
+                AgentId = componentMaster.AgentId,
+                IsActive = componentMaster.IsActive,
+                DtmUpdationDate = DateTime.Now.Date,
+                IntUpdatedBy = globals.User_ID,
+                Remarks = "IsActive AgentwiseComponent updated"
+            };
+            try
+            {
+                componentRepository.UpdateIsActive(component);
+                CompInitReq req = new CompInitReq()
+                {
+                    BrokerId = componentMaster.BrokerId,
+                    SiteId = componentMaster.SiteId,
+                    AgentId = componentMaster.AgentId,
+                    CompId = componentMaster.ComponentType,
+                    InstanceId = componentMaster.InstanceId
+                };
+                bool flag = componentMaster.IsActive==1 ? true : false;
+                CoreProcess.agentSessionCache.UpdateIsActiveFlag(req,flag);
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
+            return RedirectToAction("ComponentsMaster", new { agentId = componentMaster.AgentId, brokerid = componentMaster.BrokerId, siteid = componentMaster.SiteId });
+
+        }
+        public IActionResult Status(int brokerid, int siteid, int isAjax = 0)
+        {
+            ClaimsPrincipal claimUser = HttpContext.User;
+            if (!(claimUser.Identity.IsAuthenticated))
+            {
+                globals.User_ID = 0;
+                return RedirectToAction("Login", "Account");
+            }
+            List<ComponentStatus> status = CoreProcess.agentSessionCache.GetComponentStatus(brokerid, siteid);
+            //ViewBag.model = componentMasters;
+            ComponentViewStatus comp = new ComponentViewStatus();
+            comp.ComponentsStatus = status;
+            comp.BrokerId = brokerid;
+            comp.SiteId = siteid;
+
+            if (isAjax == 1 )
+            {
+                var json = JsonConvert.SerializeObject(status);
+                return Json(json);
+            }
+            return View(comp);
+        }
+        [HttpGet]
+        public IActionResult Cancel(int agentId,int siteId, int brokerId)
+        {
+            ClaimsPrincipal claimUser = HttpContext.User;
+            if (!claimUser.Identity.IsAuthenticated)
+            {
+                return RedirectToAction("Login", "Account");
+
+            }
+            return RedirectToAction("ComponentsMaster",new { agentId = agentId, brokerid = brokerId, siteid = siteId});
+        }
+
+        public bool CheckAuth()
+        {
+            ClaimsPrincipal claimUser = HttpContext.User;
+            if (!claimUser.Identity.IsAuthenticated)
+            {
+                return false;
+            }
+            return true;
+        }
+    }
+}
+
+
+using System.ComponentModel.DataAnnotations;
+
+namespace LoginSignupCore.Models
+{
+    public class Component
+    {
+        public int Id { get; set; }
+        public int AgentId { get; set; }
+        public int BrokerId { get; set; }
+        public int SiteId { get; set; }
+        public string? ComponentName { get; set; }
+        public string? AgentName { get; set; }
+        public int ComponentType { get; set; }
+        public int InstanceId { get; set; }
+        [Required(ErrorMessage = "ExePath required")]
+        public string ExePath { get; set; }
+        public string? CmdParam { get; set; }
+        public Boolean IsRunAsService { get; set; }
+        public string ServiceName { get; set; }
+        
+        public int Priority { get; set; }
+        public int IsActive { get; set; }
+
+        public int IsDeleted { get; set; }
+
+        public int IntCreatedBy { get; set; }
+
+        public DateTime DtmCreationDate { get; set; }
+
+        public int? IntUpdatedBy { get; set; }
+
+        public DateTime DtmUpdationDate { get; set; }
+        public string Remarks { get; set; }
+
+        public List<ComponentDropDown> com { get; set; }    = new List<ComponentDropDown>();
+    }
+}
+
+
+namespace LoginSignupCore.Models
+{
+    public class ComponentDropDown
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public int Priority { get; set; }
+    }
+}
+
+
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace LoginSignupCore.Models;
+
+public partial class ComponentMaster
+{
+    public int Id { get; set; }
+
+    public int IntComponentId { get; set; }
+
+    [Required(ErrorMessage = "Please Component Name")]
+    public string NvcComponentName { get; set; }
+    [Required(ErrorMessage = "Please CpuThreshold required")]
+    public double CpuThreshold { get; set; }
+
+    [Required(ErrorMessage = "please RamThreshold required")]
+    public double RamThreshold { get; set; }
+    [Range(1,int.MaxValue,ErrorMessage = "Please set Priority | Can't be zero")]
+    public int IntPriority { get; set; }
+    public DateTime DtmCreatedOn { get; set; }
+
+    public int? IntCreatedBy { get; set; }
+
+    public DateTime? DtmUpdatedOn { get; set; }
+
+    public int? IntUpdatedBy { get; set; }
+
+    public int BitIsActive { get; set; }
+
+    public int BitIsDelete { get; set; }
+    
+    public List<ComponentMaster> Components = new List<ComponentMaster>();
+}
+
+
+
+namespace LoginSignupCore.Models
+{
+    public class ComponentModel
+    {
+        public Component component { get; set; } = new Component();
+        public List<ComponentDropDown> list { get; set; } = new List<ComponentDropDown>();
+    }
+}
+
+
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
+
+namespace LoginSignupCore.Models
+{
+    [Table("ComponentParameter")]
+    public partial class ComponentParameter
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        [Column("ParamId")]
+        public int ParamId { get; set; }
+
+        [StringLength(3)]
+        [Unicode(false)]
+        public string ComponentId { get; set; }
+
+        [StringLength(3)]
+        [Unicode(false)]
+        public string InstanceId { get; set; }
+
+        [StringLength(64)]
+        public string ParameterName { get; set; }
+
+        [StringLength(256)]
+        public string Remarks { get; set; }
+
+        [Column("dtmCreatedOn", TypeName = "datetime")]
+        public DateTime? DtmCreatedOn { get; set; }
+
+        [Column("intCreatedBy")]
+        public int IntCreatedBy { get; set; }
+
+        [Column("dtmUpdatedOn", TypeName = "datetime")]
+        public DateTime? DtmUpdatedOn { get; set; }
+
+        [Column("intUpdatedBy")]
+        public int IntUpdatedBy { get; set; }
+
+        [Column("bitIsActive")]
+        public int BitIsActive { get; set; }
+
+        [Column("bitIsDelete")]
+        public int BitIsDelete { get; set; }
+
+        [Required]
+        [Column("bitAttributeType")]
+        public int BitAttributeType { get; set; }
+
+        [Column("brokerSiteId")]
+        public string BrokerSiteId { get; set; }
+
+        //public string ParamIdForList { get { return ParamId + " - " + ParameterName; } }
+    }
+}
+
+
+namespace LoginSignupCore.Models
+{
+    public class ComponentViewModel
+    {
+        public List<Component> Components { get; set; } = new List<Component>();
+        public Component Component { get; set; } = new Component();
+    }
+}
+
+
+
+using LoginSignupCore.Models.Response;
+
+namespace LoginSignupCore.Models
+{
+    public class ComponentViewStatus
+    {
+
+        public int BrokerId;
+
+        public int SiteId;
+       // public ComponentStatus componentStatus { get; set; } = new ComponentStatus();
+        public List<ComponentStatus> ComponentsStatus { get; set; } = new List<ComponentStatus>();
+    }
+}
