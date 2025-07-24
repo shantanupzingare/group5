@@ -1101,3 +1101,58 @@ namespace LoginSignupCore.Models
         public List<ComponentStatus> ComponentsStatus { get; set; } = new List<ComponentStatus>();
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace LoginSignupCore.Models;
+
+public partial class ComponentMaster
+{
+    public int Id { get; set; }
+
+    public int IntComponentId { get; set; }
+
+    [Required(ErrorMessage = "Please Component Name")]
+    public string NvcComponentName { get; set; }
+    [Required(ErrorMessage = "Please CpuThreshold required")]
+    public double CpuThreshold { get; set; }
+
+    [Required(ErrorMessage = "please RamThreshold required")]
+    public double RamThreshold { get; set; }
+    [Range(1,int.MaxValue,ErrorMessage = "Please set Priority | Can't be zero")]
+    public int IntPriority { get; set; }
+    public DateTime DtmCreatedOn { get; set; }
+
+    public int? IntCreatedBy { get; set; }
+
+    public DateTime? DtmUpdatedOn { get; set; }
+
+    public int? IntUpdatedBy { get; set; }
+
+    public int BitIsActive { get; set; }
+
+    public int BitIsDelete { get; set; }
+    
+    public List<ComponentMaster> Components = new List<ComponentMaster>();
+}
+
