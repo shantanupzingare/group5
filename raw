@@ -1169,5 +1169,168 @@ namespace ConsumerDbComponent
 }
 
 
+using Logging.Models;
+using Microsoft.AspNetCore.Mvc;
+using System.Diagnostics;
+
+namespace Logging.Controllers
+{
+    public class HomeController : Controller
+    {
+        private readonly ILogger<HomeController> _logger;
+
+        public HomeController(ILogger<HomeController> logger)
+        {
+            _logger = logger;
+        }
+
+        public IActionResult Index()
+        {
+            LogManager.Logger.ForContext("Component", "HomeController").Information("Index page accessed");
+            return View();
+        }
+
+        public IActionResult Privacy()
+        {
+            LogManager.Logger.ForContext("Component", "HomeController").Information("Privacy page accessed");
+            return View();
+        }
+
+        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+        public IActionResult Error()
+        {
+            LogManager.Logger.ForContext("Component", "HomeController").Information("Error page accessed");
+            return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+        }
+    }
+}
+
+
+
+
+namespace Logging.Models
+{
+    public class ErrorViewModel
+    {
+        public string? RequestId { get; set; }
+
+        public bool ShowRequestId => !string.IsNullOrEmpty(RequestId);
+    }
+}
+
+
+
+using Serilog;
+namespace Logging.Models
+{
+    public static class LogManager
+    {
+        public static Serilog.ILogger Logger { get; }
+        static LogManager()
+        {
+            Logger = new LoggerConfiguration().WriteTo.File("C:\\logs\\Demo\\app-log.txt", rollingInterval: RollingInterval.Day).CreateLogger();
+        }
+    }
+}
+
+
+@{
+    ViewData["Title"] = "Home Page";
+}
+
+<div class="text-center">
+    <h1 class="display-4">Welcome</h1>
+    <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+</div>
+
+
+
+
+@{
+    ViewData["Title"] = "Privacy Policy";
+}
+<h1>@ViewData["Title"]</h1>
+
+<p>Use this page to detail your site's privacy policy.</p>
+
+
+
+
+
+@using Logging
+@using Logging.Models
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+
+
+
+
+@{
+    Layout = "_Layout";
+}
+
+
+
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*"
+}
+
+
+
+
+
+
+
+using Serilog;
+namespace Logging
+{
+    public class Program
+    {
+        public static void Main(string[] args)
+        {
+            Log.Logger = new LoggerConfiguration()
+              .WriteTo.File("C:\\logs\\Demo\\app-log.txt", rollingInterval: RollingInterval.Day).CreateLogger();
+            var builder = WebApplication.CreateBuilder(args);
+          
+            // Add services to the container.
+            builder.Services.AddControllersWithViews();
+
+            var app = builder.Build();
+
+            // Configure the HTTP request pipeline.
+            if (!app.Environment.IsDevelopment())
+            {
+                app.UseExceptionHandler("/Home/Error");
+                // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+                app.UseHsts();
+            }
+
+            app.UseHttpsRedirection();
+            app.UseStaticFiles();
+
+            app.UseRouting();
+
+            app.UseAuthorization();
+
+            app.MapControllerRoute(
+                name: "default",
+                pattern: "{controller=Home}/{action=Index}/{id?}");
+
+            app.Run();
+        }
+    }
+}
+
+
+
+
+
+
 
 ﻿
