@@ -1329,7 +1329,148 @@ namespace Logging
 
 
 
+@using BinaryProtocol.Common;
+@using CTCL.BinaryProtocol.Common.CMA.Enum;
+@model ComponentViewStatus
+<div class="cstm_heading">
+    <h1>
+        <a asp-controller="BODProcess" asp-action="cancel" asp-route-BrokerId="@Model.BrokerId" asp-route-SiteId="@Model.SiteId">
 
+            <button type="button" class="action-btn">
+                <i class="bi bi-arrow-bar-left"></i>
+            </button>
+        </a>Component Status
+    </h1>
+
+</div>
+<div>
+    <div class="table-responsive cstm_tbl">
+        <table class="table" id="FileMaster">
+            @if (!(Model == null))
+            {
+                <thead>
+
+                    <tr>
+                        <trh>
+                            <th> Component Name </th>
+                            <th> Instance Id </th>
+                            <th>Component State </th>
+                            <th> Date Time </th>
+                            <th>Success Status </th>
+                            <th> Message </th>
+                        </trh>
+                    </tr>
+
+                </thead>
+                <tbody id="tablebodystartcom">
+                    @foreach (var status in Model.ComponentsStatus)
+                    {
+
+                        <tr style="color:black;padding-left:20px;padding-right:20px">
+                            <td> @((ComponentType)status.ComponentType) </td>
+                            <td> @status.InstanceId </td>
+                            <td>@((CMA_StatusCode)status.ComponentState) </td>
+                            <td> @status.TimeStamp </td>
+                            <td> @status.IsSucessStatus </td>
+                            <td> @status.Message </td>
+                        </tr>
+
+                    }
+                </tbody>
+            }
+        </table>
+    </div>
+</div>
+
+<input type="hidden" id="brokerid" value="@Model.BrokerId" />
+<input type="hidden" id="siteid" value="@Model.SiteId" />
+
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    function refreshTable(brokerid, siteid) {
+        debugger
+        var brokerid = $('#brokerid').val();
+        var siteid = $('#siteid').val();
+        var url = `/ComponentAssign/Status?brokerid=${brokerid}&siteid=${siteid}&isAjax=1`;
+        debugger
+        console.log(url)
+        $.ajax({
+            url: url,
+            type: 'GET',
+            success: function (data) {
+                "use strict";
+                updateTable(data); // Call the function to update tables
+                // $('#tablebodystartcom').html(data);
+            },
+            error: function (xhr, status, error) {
+
+                console.error("Error refreshing table:", error);
+            }
+        });
+    }
+    // Function to update table rows dynamically
+    function updateTable(data) {
+        debugger
+        //  alert('update function alled!!!!')
+        let tableBody = $('#tablebodystartcom'); // Replace #myTable with your table ID or class
+        tableBody.empty(); // Clear the current table rows
+        const com = JSON.parse(data);
+        for (var i = 0; i < com.length; i++)
+        {
+            //debugger
+            let state;
+            let name;
+            if(com[i].componentState == 0) {state = "Stopped" }
+            if(com[i].componentState == 1) {state = "Started" }
+            if (com[i].componentState == 2) {state = "Completed"}
+            if (com[i].componentType == 0) {name = " All" }
+            if (com[i].componentType == 1) { name = " OMS" }
+            if (com[i].componentType == 5) { name = " DBWriter" }
+            if (com[i].componentType == 6) { name = " RMS" }
+            if (com[i].componentType == 7) { name = " Consumer_Trade" }
+            if (com[i].componentType == 8) { name = " Consumer_Order" }
+            if (com[i].componentType == 9) { name = " Consumer_UserListingBalance" }
+            if (com[i].componentType == 25) { name = " NSEFOInteractiveGateway" }
+            if (com[i].componentType == 24) { name = " LoadBalancer" }
+            if (com[i].componentType == 26) { name = " PBS" }
+            if (com[i].componentType == 27) { name = " SBS" }
+            if (com[i].componentType == 28) { name = " BroadcastGateway" }
+            if (com[i].componentType == 29) { name = " TTFixBroadcastGateway" }
+            if (com[i].componentType == 30) { name = " NSECMBroadCastGateway" }
+            if (com[i].componentType == 31) { name = " NSECMInteractiveGateway" }
+            if (com[i].componentType == 32) { name = " MailSender" }
+            if (com[i].componentType == 33) { name = " FrontEnd" }
+            if (com[i].componentType == 35) { name = " SFTPServer" }
+            if (com[i].componentType == 36) { name = " CONTRACT_MASTER_READER" }
+            if (com[i].componentType == 37) { name = " MasterAPI" }
+            if (com[i].componentType == 38) { name = " TradingApi" }
+            if (com[i].componentType == 39) { name = " MarketApi" }
+            if (com[i].componentType == 40) { name = " AdminApi" }
+            if (com[i].componentType == 41) { name = " TradingWebSocket" }
+            if (com[i].componentType == 42) { name = " MarketWebSocket" }
+            if (com[i].componentType == 43) { name = " FinRMS" }
+            if (com[i].componentType == 44) { name = " IBTInteractiveApi" }
+            if (com[i].componentType == 45) { name = " AutoUpdateHost" }
+            if (com[i].componentType == 46) { name = " IBTInteractiveSocket" }
+            if (com[i].componentType == 47) { name = " IBTMarketApi" }
+            if (com[i].componentType == 48) { name = " IBTMarketSocket" }
+            if (com[i].componentType == 49) { name = " GatewayApi" }
+            if (com[i].componentType == 50) { name = " GatewaySocket" }
+            if (com[i].componentType == 51) { name = " RMSApi" }
+            if (com[i].componentType == 52) { name = " MCASTSbs" }
+            if (com[i].componentType == 53) { name = " AgentWorker" }
+
+
+
+                var tr = "<tr>";
+            var td = "<td>" + name+ "</td>" + "<td>" + com[i].instanceId + "</td>" + "<td>" + state + "</td>" + "<td>" + com[i].timeStamp + "</td>" + "<td>" + state + "</td>" + "<td>" + com[i].message + "</td>";
+             td = td + "</tr>";
+             tableBody.append(tr+td);
+        }
+    }
+    setInterval(() => refreshTable(1, 1), 2000);
+</script>
 
 
 
