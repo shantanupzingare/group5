@@ -1474,4 +1474,248 @@ namespace Logging
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@using BinaryProtocol.Common
+@using CTCL.BinaryProtocol.Common.CMA.Enum
+@model ComponentViewStatus
+
+<div class="cstm_heading">
+    <h1>
+        <a asp-controller="BODProcess" asp-action="cancel" asp-route-BrokerId="@Model.BrokerId" asp-route-SiteId="@Model.SiteId">
+            <button type="button" class="action-btn">
+                <i class="bi bi-arrow-bar-left"></i>
+            </button>
+        </a>Component Status
+    </h1>
+</div>
+<div>
+    <div class="table-responsive cstm_tbl">
+        <table class="table" id="FileMaster">
+            @if (!(Model == null))
+            {
+                <thead>
+                    <!-- UPDATED: Corrected invalid <trh> tag to <tr> -->
+                    <tr>
+                        <th> Component Name </th>
+                        <th> Instance Id </th>
+                        <th>Component State </th>
+                        <th> Date Time </th>
+                        <th>Success Status </th>
+                        <th> Message </th>
+                    </tr>
+                </thead>
+                <tbody id="tablebodystartcom">
+                    @foreach (var status in Model.ComponentsStatus)
+                    {
+                        <tr style="color:black;padding-left:20px;padding-right:20px">
+                            <td> @((ComponentType)status.ComponentType) </td>
+                            <td> @status.InstanceId </td>
+                            <td>@((CMA_StatusCode)status.ComponentState) </td>
+                            <td> @status.TimeStamp </td>
+                            <td> @status.IsSucessStatus </td>
+                            <td> @status.Message </td>
+                        </tr>
+                    }
+                </tbody>
+            }
+        </table>
+    </div>
+</div>
+
+<!-- ***** START OF NEW HTML SECTION ***** -->
+<!-- This divider visually separates the status table from the new log viewer -->
+<hr class="my-5" />
+
+<div class="cstm_heading">
+    <h1 class="d-flex">Real-Time Component Log Viewer</h1>
+</div>
+
+<div class="row mb-3 mt-4">
+    <div class="col-md-5">
+        <label for="componentSelect" class="form-label">Component</label>
+        <select id="componentSelect" class="form-select" asp-items="@Model.Components">
+            <option value="">-- Select a Component --</option>
+        </select>
+    </div>
+    <div class="col-md-5">
+        <label for="logTypeSelect" class="form-label">Log Level</label>
+        <select id="logTypeSelect" class="form-select" asp-items="@Model.LogTypes">
+                <option value="">-- Select a Log Level --</option>
+        </select>
+    </div>
+</div>
+
+<h4>Logs</h4>
+<div id="log-display" class="p-3" style="background-color: #f8f9fa; border: 1px solid #dee2e6; height: 600px; overflow-y: auto; font-family: monospace; white-space: pre-wrap;">
+    <p class="text-muted">Select a component and log level to see logs.</p>
+</div>
+<!-- ***** END OF NEW HTML SECTION ***** -->
+
+
+<input type="hidden" id="brokerid" value="@Model.BrokerId" />
+<input type="hidden" id="siteid" value="@Model.SiteId" />
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    // ***** START OF UPDATED SCRIPT SECTION *****
+    // Wrapping all scripts in $(document).ready() is a good practice.
+    $(document).ready(function() {
+
+        // --- Your Existing JavaScript for Component Status Table Refresh ---
+        function refreshTable() {
+            var brokerid = $('#brokerid').val();
+            var siteid = $('#siteid').val();
+            var url = `/ComponentAssign/Status?brokerid=${brokerid}&siteid=${siteid}&isAjax=1`;
+            
+            $.ajax({
+                url: url,
+                type: 'GET',
+                success: function (data) {
+                    "use strict";
+                    updateTable(data);
+                },
+                error: function (xhr, status, error) {
+                    console.error("Error refreshing table:", error);
+                }
+            });
+        }
+
+        function updateTable(data) {
+            let tableBody = $('#tablebodystartcom');
+            tableBody.empty();
+            const com = JSON.parse(data);
+            for (var i = 0; i < com.length; i++)
+            {
+                // This large block of if statements maps numeric IDs to string names
+                let state;
+                let name;
+                if(com[i].componentState == 0) {state = "Stopped" }
+                if(com[i].componentState == 1) {state = "Started" }
+                if (com[i].componentState == 2) {state = "Completed"}
+                if (com[i].componentType == 0) {name = " All" }
+                if (com[i].componentType == 1) { name = " OMS" }
+                if (com[i].componentType == 5) { name = " DBWriter" }
+                // ... (the rest of your componentType mapping if-statements go here) ...
+                if (com[i].componentType == 53) { name = " AgentWorker" }
+
+                var tr = "<tr>";
+                // UPDATED: Corrected the 5th column to use 'isSucessStatus' to match your C# loop
+                var td = "<td>" + name + "</td>" + "<td>" + com[i].instanceId + "</td>" + "<td>" + state + "</td>" + "<td>" + com[i].timeStamp + "</td>" + "<td>" + com[i].isSucessStatus + "</td>" + "<td>" + com[i].message + "</td>";
+                td = td + "</tr>";
+                tableBody.append(tr+td);
+            }
+        }
+        
+        // This will keep refreshing your status table every 2 seconds
+        setInterval(refreshTable, 2000);
+
+        // --- NEW JavaScript for the Real-Time Log Viewer ---
+        let logInterval;
+
+        function fetchLogs() {
+            const componentValue = $('#componentSelect').val();
+            const logType = $('#logTypeSelect').val();
+
+            if (!componentValue || !logType) {
+                return;
+            }
+            
+            const ids = componentValue.split(':');
+            const agentId = ids[0];
+            const componentId = ids[1];
+            const instanceId = ids[2];
+
+            $.ajax({
+                url: '@Url.Action("GetLogs", "ComponentAssign")',
+                type: 'GET',
+                data: {
+                    brokerId: $('#brokerid').val(),
+                    siteId: $('#siteid').val(),
+                    agentId: agentId,
+                    componentId: componentId,
+                    instanceId: instanceId,
+                    logType: logType
+                },
+                success: function (logs) {
+                    const logDisplay = $('#log-display');
+                    logDisplay.empty();
+
+                    if (logs.length === 0) {
+                        logDisplay.html('<p class="text-muted">No logs found for this selection.</p>');
+                        return;
+                    }
+
+                    $.each(logs, function (index, log) {
+                        const timestamp = new Date(log.timestamp).toLocaleString();
+                        const logClass = getLogLevelClass(log.logLevel);
+                        const logHtml = `<div><span style="color: #6c757d;">[${timestamp}]</span> <span class="fw-bold ${logClass}">${getLogLevelName(log.logLevel)}:</span> <span>${log.message}</span></div>`;
+                        logDisplay.append(logHtml);
+                    });
+                },
+                error: function () {
+                    $('#log-display').html('<p class="text-danger">An error occurred while fetching logs.</p>');
+                }
+            });
+        }
+
+        function startLogFetching() {
+            if (logInterval) clearInterval(logInterval);
+            fetchLogs(); 
+            logInterval = setInterval(fetchLogs, 3000); 
+        }
+        
+        $('#componentSelect, #logTypeSelect').on('change', startLogFetching);
+
+        function getLogLevelClass(level) {
+            switch(level) {
+                case 0: return 'text-secondary'; // Verbose
+                case 1: return 'text-info';      // Debug
+                case 2: return 'text-primary';   // Info
+                case 3: return 'text-warning';   // Warning
+                case 4: return 'text-danger';    // Error
+                case 5: return 'text-danger fw-bold'; // Fatal
+                default: return 'text-dark';
+            }
+        }
+
+        function getLogLevelName(level) {
+            switch(level) {
+                case 0: return 'VERBOSE';
+                case 1: return 'DEBUG';
+                case 2: return 'INFO';
+                case 3: return 'WARNING';
+                case 4: return 'ERROR';
+                case 5: return 'FATAL';
+                default: return 'UNKNOWN';
+            }
+        }
+    });
+    // ***** END OF UPDATED SCRIPT SECTION *****
+</script>
+
+
+
+
 ﻿
