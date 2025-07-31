@@ -3474,4 +3474,896 @@ namespace LoginSignupCore.MasterCache
 }
 
 
+@using BinaryProtocol.Common;
+@using CTCL.BinaryProtocol.Common.CMA.Enum;
+@model TechnicalInfoViewModel;
+<div class="cstm_heading">
+    <h1>
+        <a asp-controller="BODProcess" asp-action="cancel" asp-route-BrokerId="@Model.BrokerId" asp-route-SiteId="@Model.SiteId">
+
+            <button type="button" class="action-btn">
+
+                <i class="bi bi-arrow-bar-left"></i>
+            </button>
+        </a>
+        Components Technical Information</h1>
+
+</div>
+<div class="table-responsive cstm_tbl">
+    <table class="table" id="FileMaster">
+        @if (!(Model == null))
+        {
+            <thead>
+                <tr>
+                    <th> Component Name </th>
+                    <th> Instance ID</th>
+                    <th> Agent Name </th>
+                    <th> CPU Utilization %</th>
+                    <th> RAM Utilization %</th>
+                    <th> CPU High %</th>
+                    <th> CPU Low %</th>
+                    <th> RAM High (Mb)</th>
+                    <th> RAM Low (Mb) </th>
+                    <th> Updated Time</th>
+                </tr>
+            </thead>
+            <tbody id="tablebodystartcom">
+
+                @foreach (var component in Model.TechnicalInfos)
+                {
+
+                    <tr>
+                        <td> @component.ComponentName</td>
+                        <td> @component.InstanceId </td>
+                        <td> @component.AgentName </td>
+                        <td> @component.CPUUtilization </td>
+                        <td> @component.RAMUtilization </td>
+                        <td> @component.CPUHigh </td>
+                        <td> @component.CPULow </td>
+                        <td> @component.RAMHigh </td>
+                        <td> @component.RAMLow </td>
+                        <td> @component.Timestamp </td>
+                    </tr>
+
+                }
+            </tbody>
+        }
+    </table>
+</div>
+
+
+<input type="hidden" id="brokerid" value="@Model.BrokerId" />
+<input type="hidden" id="siteid" value="@Model.SiteId" />
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    function refreshTable(brokerid, siteid) {
+        debugger
+        var brokerid = $('#brokerid').val();
+        var siteid = $('#siteid').val();
+        var url = `/BODProcess/TechnicalInfo?brokerid=${brokerid}&siteid=${siteid}&isAjax=1`;
+        debugger
+        
+        $.ajax({
+            url: url,
+            type: 'GET',
+            success: function (data) {
+                "use strict";
+                updateTable(data); // Call the function to update tables
+                // $('#tablebodystartcom').html(data);
+                console.log(url)
+            },
+            error: function (xhr, status, error) {
+
+                console.error("Error refreshing table:", error);
+            }
+        });
+    }
+    // Function to update table rows dynamically
+    function updateTable(data) {
+        debugger
+        let tableBody = $('#tablebodystartcom'); // Replace #myTable with your table ID or class
+        tableBody.empty(); // Clear the current table rows
+        const com = JSON.parse(data);
+        for (var i = 0; i < com.length; i++) {
+            var tr = "<tr>";
+            var td = "<td>" + com[i].ComponentName + "</td>" + "<td>" + com[i].InstanceId + "</td>" + "<td>" + com[i].AgentName + "</td>" + "<td>" + com[i].CPUUtilization
+                + "</td>" + "<td>" + com[i].RAMUtilization + "</td>" + "<td>" + com[i].CPUHigh + "</td>" + "<td>" + com[i].CPULow + "</td>" +
+                "<td>" + com[i].RAMHigh + "</td>" + "<td>" + com[i].RAMLow + "</td>" + "<td>" + com[i].Timestamp + "</td>";
+            td = td + "</tr>";
+            tableBody.append(tr + td);
+        }
+    }
+    setInterval(() => refreshTable(1, 1), 3000);
+</script>
+
+
+
+
+@model LoginSignupCore.Models.ComponentViewStatus
+@{
+    ViewData["Title"] = "Component Logs";
+}
+
+<div class="container mt-4">
+    <div class="cstm_heading">
+        <h1 class="d-flex">Real-Time Component Log Viewer</h1>
+        <h5 class="text-muted">Broker ID: @Model.BrokerId | Site ID: @Model.SiteId</h5>
+    </div>
+
+    <div class="row mb-3 mt-4">
+        <div class="col-md-5">
+            <label for="componentSelect" class="form-label">Component</label>
+            <select id="componentSelect" class="form-select" asp-items="@Model.Components">
+                <option value="">-- Select a Component --</option>
+            </select>
+        </div>
+        <div class="col-md-5">
+            <label for="logTypeSelect" class="form-label">Log Level</label>
+            <select id="logTypeSelect" class="form-select" asp-items="@Model.LogType">
+                <option value="">-- Select a Log Level --</option>
+            </select>
+        </div>
+    </div>
+
+    <hr />
+
+    <h4>Logs</h4>
+    <div id="log-display" class="p-3" style="background-color: #f8f9fa; border: 1px solid #dee2e6; height: 600px; overflow-y: auto; font-family: monospace; white-space: pre-wrap;">
+        <p class="text-muted">Select a component and log level to see logs.</p>
+    </div>
+</div>
+
+<input type="hidden" id="brokerid" value="@Model.BrokerId" />
+<input type="hidden" id="siteid" value="@Model.SiteId" />
+
+@section Scripts {
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script type="text/javascript">
+        $(document).ready(function () {
+            let logInterval;
+
+            function fetchLogs() {
+                const componentValue = $('#componentSelect').val();
+                const logType = $('#logTypeSelect').val();
+
+                if (!componentValue || !logType) {
+                    return; // Do nothing if selections are incomplete
+                }
+
+                // Parse the composite key from the component dropdown
+                const ids = componentValue.split(':');
+                const agentId = ids[0];
+                const componentId = ids[1];
+                const instanceId = ids[2];
+
+                $.ajax({
+                    url: '@Url.Action("GetLogs", "ComponentAssign")', // Correctly points to the new action
+                    type: 'GET',
+                    data: {
+                        brokerId: @Model.BrokerId,
+                        siteId: @Model.SiteId,
+                        agentId: agentId,
+                        componentId: componentId,
+                        instanceId: instanceId,
+                        logType: logType
+                    },
+                    success: function (logs) {
+                        const logDisplay = $('#log-display');
+                        logDisplay.empty();
+
+                        if (logs.length === 0) {
+                            logDisplay.html('<p class="text-muted">No logs found for this selection.</p>');
+                            return;
+                        }
+
+                        $.each(logs, function (index, log) {
+                            const timestamp = new Date(log.timestamp).toLocaleString();
+                            const logClass = getLogLevelClass(log.logLevel);
+                            const logHtml = `<div><span style="color: #6c757d;">[${timestamp}]</span> <span class="fw-bold ${logClass}">${getLogLevelName(log.logLevel)}:</span> <span>${log.message}</span></div>`;
+                            logDisplay.append(logHtml);
+                        });
+                    },
+                    error: function () {
+                        $('#log-display').html('<p class="text-danger">An error occurred while fetching logs.</p>');
+                    }
+                });
+            }
+
+            function startLogFetching() {
+                if (logInterval) clearInterval(logInterval);
+                fetchLogs();
+                logInterval = setInterval(fetchLogs, 3000);
+            }
+
+            $('#componentSelect, #logTypeSelect').on('change', startLogFetching);
+
+            function getLogLevelClass(level) {
+                switch (level) {
+                    case 0: return 'text-secondary'; // Verbose
+                    case 1: return 'text-info';      // Debug
+                    case 2: return 'text-primary';   // Info
+                    case 3: return 'text-warning';   // Warning
+                    case 4: return 'text-danger';    // Error
+                    case 5: return 'text-danger fw-bold'; // Fatal
+                    default: return 'text-dark';
+                }
+            }
+
+            function getLogLevelName(level) {
+                switch (level) {
+                    case 0: return 'VERBOSE';
+                    case 1: return 'DEBUG';
+                    case 2: return 'INFO';
+                    case 3: return 'WARNING';
+                    case 4: return 'ERROR';
+                    case 5: return 'FATAL';
+                    default: return 'UNKNOWN';
+                }
+            }
+        });
+    </script>
+}
+
+
+
+
+
+using BinaryProtocol.Common;
+using CTCL.CacheManagement.Structs;
+using LoginSignupCore.Core;
+using LoginSignupCore.Data;
+using LoginSignupCore.MasterCache;
+using LoginSignupCore.Models;
+using LoginSignupCore.Models.Request;
+using LoginSignupCore.Models.Response;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using System.ComponentModel;
+using System.Security.Claims;
+using System.Security.Policy;
+using Component = LoginSignupCore.Models.Component;
+
+namespace LoginSignupCore.Controllers
+{
+
+    public class ComponentAssignController: Controller
+    {
+        private readonly ComponentRepository componentRepository;
+        public ComponentAssignController()
+        {
+            componentRepository = new();
+        }
+        [HttpGet]
+        public IActionResult ComponentsMaster(int agentId, int brokerid,int siteid,int id=0)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            ComponentViewModel ComponentsView = new();
+            try
+            {
+                ComponentsView.Components = componentRepository.GetAllComponentAgentWise(agentId);
+                ComponentsView.Component = new();
+                ComponentsView.Component.AgentId = agentId;
+                ComponentsView.Component.BrokerId = brokerid;
+                ComponentsView.Component.SiteId = siteid;
+                ComponentsView.Component.Id = id;
+                ComponentsView.Component.AgentName = CoreProcess.agentSessionCache.GetSession(brokerid, siteid, agentId).Item2?.AgentName??string.Empty;
+
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
+            return View(ComponentsView);
+        }
+        [HttpPost]
+        public IActionResult Component(Component componentMaster)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            var component = new Component()
+            {
+                Id= componentMaster.Id,
+                BrokerId = componentMaster.BrokerId,
+                SiteId = componentMaster.SiteId,
+                AgentId= componentMaster.AgentId,
+                ComponentType= componentMaster.ComponentType,
+                ExePath= componentMaster.ExePath,
+                InstanceId = componentMaster.InstanceId,
+                CmdParam= string.IsNullOrEmpty(componentMaster.CmdParam) ?"": componentMaster.CmdParam,
+                IsRunAsService = componentMaster.IsRunAsService,
+                ServiceName = componentMaster.ServiceName,
+                Priority=componentMaster.Priority,
+                DtmCreationDate = DateTime.Now.Date,
+                IntCreatedBy = globals.User_ID,
+                Remarks = componentMaster.Remarks,
+                ComponentName = componentMaster.ComponentName,
+                AgentName = CoreProcess.agentSessionCache.GetSession(componentMaster.BrokerId, componentMaster.SiteId, componentMaster.AgentId).Item2?.AgentName??string.Empty
+            };
+            if (ModelState.IsValid)
+            {
+                try
+                {
+                    componentRepository.InsertAgentWiseComponentData(component);
+                }
+                catch (Exception ex)
+                {
+                    throw;
+                }
+             return RedirectToAction("ComponentsMaster", new { agentId = componentMaster.AgentId, brokerid = componentMaster.BrokerId, siteid = componentMaster.SiteId });
+
+            }
+            foreach (var item in ModelState.Values.SelectMany(v => v.Errors))
+            {
+                Console.WriteLine(item.ErrorMessage);
+            }
+            List<ComponentDropDown> list = componentRepository.GetComponentDropDowmList(component.AgentId);
+            if (list != null && list.Count > 0)
+                //ViewBag.ComponentDropDown = list;
+            componentMaster.com = list;
+             return RedirectToAction("Component", new { agentId = componentMaster.AgentId, brokerid = componentMaster.BrokerId, siteid = componentMaster.SiteId });
+            //return PartialView(component);
+        }
+       [HttpGet("ComponentAssign/ComponentFile/{agentId}/{brokerid}/{siteid}/{id?}")]
+        public IActionResult ComponentFile(int agentId, int brokerid, int siteid,int id=0)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            Component comp = new Component();
+            if (id != 0)
+            {
+                 comp = componentRepository.GetComponentById(id);
+                comp.BrokerId = brokerid;
+                comp.SiteId = siteid;
+                comp.AgentName =  CoreProcess.agentSessionCache.GetSession(brokerid,siteid,agentId).Item2?.AgentName??string.Empty;
+
+
+            }
+            else
+            {
+                 comp = new Component()
+                {
+                    Id = 0,
+                    AgentId = agentId,
+                    BrokerId = brokerid,
+                    SiteId= siteid
+                };
+            }
+
+            List<ComponentDropDown> list = componentRepository.GetComponentDropDowmList(agentId);
+            if (list != null && list.Count > 0)
+                comp.com = list;
+
+            return PartialView("Component", comp);
+            //return RedirectToAction("ComponentsMaster", new { agentId = comp.AgentId, brokerid = comp.BrokerId, siteid = comp.SiteId });
+        }
+       
+        public IActionResult Update(Component componentMaster)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            var component = new Component()
+            {
+                Id = componentMaster.Id,
+                AgentId = componentMaster.AgentId,
+                BrokerId = componentMaster.BrokerId,
+                SiteId = componentMaster.SiteId,
+                AgentName = componentMaster.AgentName,
+                ComponentName = componentMaster.ComponentName,
+                InstanceId = componentMaster.InstanceId,
+                ComponentType = componentMaster.ComponentType,
+                ExePath = componentMaster.ExePath,
+                CmdParam = componentMaster.CmdParam ?? string.Empty,
+                IsRunAsService = componentMaster.IsRunAsService,
+                ServiceName = componentMaster.ServiceName,
+                Priority = componentMaster.Priority,
+                DtmUpdationDate = DateTime.Now.Date,
+                IntUpdatedBy = globals.User_ID,
+                Remarks = componentMaster.Remarks,
+
+            };
+            try
+            {
+                componentRepository.UpdateData(component);
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
+            return RedirectToAction("ComponentsMaster", new { agentId = componentMaster.AgentId, brokerid =componentMaster.BrokerId, siteid =componentMaster.SiteId });
+
+        }
+      
+        public IActionResult Delete(Component componentmaster)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            var component = new Component()
+            {
+                Id = componentmaster.Id,
+                AgentId = componentmaster.AgentId,
+                IsDeleted = 1,
+                DtmUpdationDate = DateTime.Now.Date,
+                IntUpdatedBy = globals.User_ID,
+                Remarks = "Deleted AgentwiseComponent",
+                BrokerId = componentmaster.BrokerId,
+                SiteId = componentmaster.SiteId
+                
+            };
+            try
+            {
+                componentRepository.UpdateIsDelete(component);
+                CompInitReq req = new CompInitReq()
+                {
+                    BrokerId = componentmaster.BrokerId,
+                    SiteId = componentmaster.SiteId,
+                    AgentId = componentmaster.AgentId,
+                    CompId = componentmaster.ComponentType,
+                    InstanceId = componentmaster.InstanceId
+                };
+                bool flag = true;
+                CoreProcess.agentSessionCache.UpdateIsDeleteFlag(req, flag);
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
+            return RedirectToAction("ComponentsMaster", new { agentId = component.AgentId, brokerid = component.BrokerId, siteid = component.SiteId });
+
+        }
+        public IActionResult Edit(Component componentMaster)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            var component = new Component()
+            {
+                Id = componentMaster.Id,
+                AgentId = componentMaster.AgentId,
+                IsActive = componentMaster.IsActive,
+                DtmUpdationDate = DateTime.Now.Date,
+                IntUpdatedBy = globals.User_ID,
+                Remarks = "IsActive AgentwiseComponent updated"
+            };
+            try
+            {
+                componentRepository.UpdateIsActive(component);
+                CompInitReq req = new CompInitReq()
+                {
+                    BrokerId = componentMaster.BrokerId,
+                    SiteId = componentMaster.SiteId,
+                    AgentId = componentMaster.AgentId,
+                    CompId = componentMaster.ComponentType,
+                    InstanceId = componentMaster.InstanceId
+                };
+                bool flag = componentMaster.IsActive==1 ? true : false;
+                CoreProcess.agentSessionCache.UpdateIsActiveFlag(req,flag);
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
+            return RedirectToAction("ComponentsMaster", new { agentId = componentMaster.AgentId, brokerid = componentMaster.BrokerId, siteid = componentMaster.SiteId });
+
+        }
+
+        public IActionResult Status(int brokerid, int siteid, int isAjax = 0)
+        {
+            ClaimsPrincipal claimUser = HttpContext.User;
+            if (!(claimUser.Identity.IsAuthenticated))
+            {
+                globals.User_ID = 0;
+                return RedirectToAction("Login", "Account");
+            }
+            List<ComponentStatus> status = CoreProcess.agentSessionCache.GetComponentStatus(brokerid, siteid);
+            //ViewBag.model = componentMasters;
+            ComponentViewStatus comp = new ComponentViewStatus();
+            comp.ComponentsStatus = status;
+            comp.BrokerId = brokerid;
+            comp.SiteId = siteid;
+
+            if (isAjax == 1)
+            {
+                var json = JsonConvert.SerializeObject(status);
+                return Json(json);
+            }
+            return View(comp);
+        }
+
+
+        public IActionResult LogViewer(int brokerid,int siteid,int isAjax=0)
+        {
+            if(!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            var componentFromCache = CoreProcess.agentSessionCache.GetComponentMaster(brokerid, siteid).Item2 ?? new List<MasterCache.Component>();//for dropdown
+            var logLevels = Enum.GetValues(typeof(LogType)).Cast<LogType>();//for the other dropdown
+            ComponentViewStatus model = new ComponentViewStatus()
+            {
+
+                BrokerId = brokerid,
+                SiteId = siteid,
+                Components = componentFromCache.Where(c => c.componentMaster != null).Select(c => new SelectListItem
+                {
+                    Value = $"{c.componentMaster.AgentId},{c.componentMaster.ComponentId},{c.componentMaster.InstanceId}",
+                    Text = $"{c.componentMaster.ComponentName ?? "unknown"} (Agent:{c.componentMaster.AgentId},Inst:{c.componentMaster.InstanceId})"
+                }).ToList(),
+                LogType = logLevels.Select(lt => new SelectListItem
+                {
+                    Value = ((int)lt).ToString(),
+                    Text = lt.ToString()
+                }).ToList()
+            };
+            if (isAjax == 1)
+            {
+                var json = JsonConvert.SerializeObject(componentFromCache);
+                return Json(json);
+            }
+            return View(model);
+        }
+
+        [HttpGet]
+        public IActionResult GetLogs(int brokerId,int siteId,int agentId,int componentId,int instanceId,int logType)
+        {
+            var logTypeEnum = (LogType)logType;
+            var logs = CoreProcess.agentSessionCache.GetLogs(brokerId, siteId, agentId, componentId, instanceId, logTypeEnum);
+            return Json(logs);
+        }
+
+        [HttpGet]
+        public IActionResult Cancel(int agentId,int siteId, int brokerId)
+        {
+            ClaimsPrincipal claimUser = HttpContext.User;
+            if (!claimUser.Identity.IsAuthenticated)
+            {
+                return RedirectToAction("Login", "Account");
+
+            }
+            return RedirectToAction("ComponentsMaster",new { agentId = agentId, brokerid = brokerId, siteid = siteId});
+        }
+
+        public bool CheckAuth()
+        {
+            ClaimsPrincipal claimUser = HttpContext.User;
+            if (!claimUser.Identity.IsAuthenticated)
+            {
+                return false;
+            }
+            return true;
+        }
+    }
+}
+
+
+
+
+using LoginSignupCore.Core;
+using Component = LoginSignupCore.MasterCache.Component;
+using Microsoft.AspNetCore.Mvc;
+using System.Security.Policy;
+using LoginSignupCore.Models;
+using LoginSignupCore.MasterCache;
+using Microsoft.Extensions.Logging;
+using CTCL.BinaryProtocol.Common.CMA.Enum;
+using Newtonsoft.Json;
+using LoginSignupCore.Data;
+using System.Security.Claims;
+
+namespace LoginSignupCore.Controllers
+{
+    public class BODProcessController : Controller
+    {
+        private readonly BrokerRepository brokerRepository;
+        private readonly BrokerSiteRepository brokerSiteRepository;
+        public BODProcessController()
+        {
+            brokerRepository = new();
+            brokerSiteRepository = new();
+        }
+        public IActionResult Index(int brokerid, int siteid)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            AgentMaster agent = new AgentMaster()
+            {
+                BrokerSiteId = siteid,
+                BrokerId = brokerid,
+                AgentName =  brokerRepository.GetBrokerById(brokerid).NvcBrokerName,
+                SiteName = brokerSiteRepository.GetBrokerSitesById(siteid).NvcSiteName,
+            };
+            return View(agent);
+        }
+        public IActionResult StartComponent(int brokerid, int siteid, int isAjax= 0)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            List<Component> componentMasters = new List<Component>();
+            var componentMaster = CoreProcess.agentSessionCache.GetComponentMaster(brokerid, siteid);
+            if (componentMaster.Item1 == true && componentMaster.Item2 != null && componentMaster.Item2.Count > 0)
+            {
+                componentMasters = componentMaster.Item2.Where(x => x.componentMaster.IsActive == true && x.componentMaster.IsDelete == false).OrderBy(p => p.componentMaster.Priority).ToList();
+
+                if (componentMasters.Any())
+                {
+                    componentMasters[0].isenabled = true;
+                    for (int i = 1; i < componentMasters.Count; i++)
+                    {
+
+                        if (componentMasters[i - 1].isRequestSend == true && componentMasters[i - 1].status == (int)CMA_StatusCode.Completed)
+                        {
+                            componentMasters[i].isenabled = true;
+                        }
+                        else
+                        {
+                            componentMasters[i].isenabled = true;
+                        }
+                    }
+                }
+
+            }
+            BODUploadComponent comp = new BODUploadComponent();
+            comp.component.componentMaster = new();
+            comp.component.componentMaster.BrokerId = brokerid;
+            comp.component.componentMaster.SiteId = siteid;
+            comp.Components = componentMasters;
+
+
+
+            if (isAjax == 1)
+            {
+                var json = JsonConvert.SerializeObject(componentMasters);
+                return Json(json);
+            }
+            return View(comp);
+        }
+        public IActionResult UploadFile(int brokerid, int siteid)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+
+            List<FileMasterInfo> fileMasters = new List<FileMasterInfo>();
+            var fileMaster = CoreProcess.agentSessionCache.GetFileMasterInfo(brokerid, siteid);
+            if (fileMaster.Item1 == true && fileMaster.Item2.Count > 0)
+            {
+                fileMasters = fileMaster.Item2.Where(x => x.IsUploadBeforeBOD == true).ToList();
+            }
+            BODUploadFileView file = new BODUploadFileView();
+            file.fileMasterInfo.BrokerId = brokerid;
+            file.fileMasterInfo.SiteId = siteid;
+            //file.fileMasterInfo.SiteId = fileMasters.FirstOrDefault().SiteId;
+            file.fileMastersInfo = fileMasters;
+
+            return View(file);
+        }
+        public IActionResult UploadFileAfterBOD(int brokerid, int siteid)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            List<FileMasterInfo> fileMasters = new List<FileMasterInfo>();
+            var fileMaster = CoreProcess.agentSessionCache.GetFileMasterInfo(brokerid, siteid);
+            if (fileMaster.Item1 == true && fileMaster.Item2.Count > 0)
+            {
+                fileMasters = fileMaster.Item2.Where(x => x.IsUploadBeforeBOD == false).ToList();
+            }
+            BODUploadFileView file = new BODUploadFileView();
+            file.fileMasterInfo.BrokerId = brokerid;
+            file.fileMasterInfo.SiteId = siteid;
+            file.fileMastersInfo = fileMasters;
+
+            return View(file);
+        }
+        public IActionResult TechnicalInfo(int brokerid, int siteid ,int isAjax = 0)
+        {
+            if(!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            List<ComponentsTechnicalInfo> infos = new();
+            var info = CoreProcess.agentSessionCache.GetTechnicalInfo(brokerid, siteid);
+            if (info != null)
+            {
+                infos = info;
+            }
+            TechnicalInfoViewModel tecinfo = new TechnicalInfoViewModel();
+            tecinfo.BrokerId = brokerid;
+            tecinfo.SiteId = siteid;
+            tecinfo.TechnicalInfos = infos;
+
+            if (isAjax == 1)
+            {
+                var json = JsonConvert.SerializeObject(infos);
+                return Json(json);
+            }
+            return View(tecinfo);
+        }
+
+        [HttpGet]
+        public IActionResult Cancel(int brokerId, int siteId)
+        {
+            if (!CheckAuth())
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            return RedirectToAction("Index", new {brokerId=brokerId, siteId = siteId});
+        }
+
+        public bool CheckAuth()
+        {
+            ClaimsPrincipal claimUser = HttpContext.User;
+            if (!claimUser.Identity.IsAuthenticated)
+            {
+                return false;
+            }
+            return true;
+        }
+    }
+}
+
+
+
+
+
+@using CTCL.BinaryProtocol.Common.CMA.Enum;
+@using LoginSignupCore.Models.Request;
+@model BODUploadComponent;
+<div class="cstm_heading">
+    <h1>
+        <a asp-controller="BODProcess" asp-action="cancel" asp-route-BrokerId="@Model.component.componentMaster.BrokerId" asp-route-SiteId="@Model.component.componentMaster.SiteId">
+
+            <button type="button" class="action-btn">
+
+                <i class="bi bi-arrow-bar-left"></i>
+            </button>
+        </a>components
+    </h1>
+</div>
+<div class="table-responsive cstm_tbl">
+    <table class="table" id="startBOD">
+
+        @if (!(Model == null))
+        {
+            <thead>
+                <tr>
+                    <th> Component Name </th>
+                    <th> Instance ID</th>
+                    <th> Agent </th>
+                    <th> Component State </th>
+                    <th> Action </th>
+                </tr>
+            </thead>
+            <tbody id="tablebodystartcom">
+
+                @foreach (var component in Model.Components)
+                {
+
+                    <tr>
+                        <td> @component.componentMaster.ComponentName</td>
+                        <td> @component.componentMaster.InstanceId </td>
+                        <td> @component.componentMaster.AgentName </td>
+                        <td> @((CMA_StatusCode)component.status) </td>
+                        @if (@component.status == 0)
+                        {
+                            <td>
+                                <form id="form" asp-controller="Main" asp-action="StartComponent" method="post">
+                                    <input type="hidden" id="BrokerId" name="BrokerId" value="@component.componentMaster.BrokerId">
+                                    <input type="hidden" id="SiteId" name="SiteId" value="@component.componentMaster.SiteId">
+                                    <input type="hidden" id="AgentId" name="AgentId" value="@component.componentMaster.AgentId">
+                                    <input type="hidden" id="CompId" name="CompId" value="@component.componentMaster.ComponentId">
+                                    <input type="hidden" id="InstanceId" name="InstanceId" value="@component.componentMaster.InstanceId">
+                                    <button type="submit" class="btn btn-primary" id="start_button" @(component.isenabled ? "":"disabled")>
+                                        Start
+                                    </button>
+                                </form>
+
+                            </td>
+                        }
+                        else
+                        {
+
+                            <td>
+                                <form id="form" asp-controller="Main" asp-action="StopComponent" method="post">
+                                    <input type="hidden" id="BrokerId" name="BrokerId" value="@component.componentMaster.BrokerId">
+                                    <input type="hidden" id="SiteId" name="SiteId" value="@component.componentMaster.SiteId">
+                                    <input type="hidden" id="AgentId" name="AgentId" value="@component.componentMaster.AgentId">
+                                    <input type="hidden" id="CompId" name="CompId" value="@component.componentMaster.ComponentId">
+                                    <input type="hidden" id="InstanceId" name="InstanceId" value="@component.componentMaster.InstanceId">
+                                    <button type="submit" class="btn btn-danger" @(component.isenabled ? "":"disabled")>
+                                        Stop
+                                    </button>
+                                </form>
+
+                            </td>
+                        }
+                    </tr>
+
+                }
+            </tbody>
+        }
+    </table>
+</div>
+
+
+<input type="hidden" id="brokerid" value="@Model.component.componentMaster.BrokerId" />
+<input type="hidden" id="siteid" value="@Model.component.componentMaster.SiteId" />
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    function refreshTable(brokerid, siteid) {
+        var brokerid = $('#brokerid').val();
+        var siteid = $('#siteid').val();
+        var url = `/BODProcess/StartComponent?brokerid=${brokerid}&siteid=${siteid}&isAjax=1`;
+        $.ajax({
+            url: url,
+            type: 'GET',
+            success: function (data) {
+                "use strict";
+                updateTable(data); // Call the function to update tables
+                //$('html').html(data);
+            },
+            error: function (xhr, status, error) {
+
+                console.error("Error refreshing table:", error);
+            }
+        });
+    }
+    // Function to update table rows dynamically
+    function updateTable(data) {
+        let tableBody = $('#tablebodystartcom'); // Replace #myTable with your table ID or class
+        tableBody.empty(); // Clear the current table rows
+        const com = JSON.parse(data);
+        com.forEach(item => {
+           //debugger
+            const buttonLabel = item.status==0 ? 'Start':'Stop';
+            const btnclass = item.status == 0 ? "btn btn-primary" : "btn btn-danger";
+            const state = item.status == 0 ? "Stopped" : item.status == 1? "Started":"Completed";
+            const ActionUrl = item.status == 0 ? '@Url.Action("StartComponent","Main")' : '@Url.Action("StopComponent","Main")'
+            com.sort((a, b) => a.componentMaster.Priority - b.componentMaster.Priority)
+            tableBody.append(`<tr>
+                            <td> ${item.componentMaster.ComponentName}</td>
+                            <td> ${item.componentMaster.InstanceId} </td>
+                            <td> ${item.componentMaster.AgentName}</td>
+                                <td> ${state} </td>
+                                <td>
+                                        <form id="form"  method="post" action="${ActionUrl}">
+                                            <input type="hidden" id="BrokerId" name="BrokerId" value="${item.componentMaster.BrokerId}">
+                                            <input type="hidden" id="SiteId" name="SiteId" value="${item.componentMaster.SiteId}">
+                                                    <input type="hidden" id="AgentId" name="AgentId" value="${item.componentMaster.AgentId}">
+                                            <input type="hidden" id="CompId" name="CompId" value="${item.componentMaster.ComponentId}">
+                                            <input type="hidden" id="InstanceId" name="InstanceId" value="${item.componentMaster.InstanceId}">
+                                        <button type="submit" class="${btnclass}" id="start_button" ${item.isenabled ? "" : "disabled"}>
+                                            ${buttonLabel}
+                                        </button>
+                                    </form>
+
+                                </td>
+
+     </tr>`);
+        });
+    }
+    // Set the interval to refresh every 5 seconds (5000 ms)
+    setInterval(() => refreshTable(1, 1), 20000);
+</script>
+
 
